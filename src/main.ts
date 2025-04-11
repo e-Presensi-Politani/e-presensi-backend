@@ -1,16 +1,28 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { ConfigService } from '@nestjs/config';
+import { ConfigService } from './config/config.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
+  
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('APP_PORT');
-  if (!port) {
-    throw new Error('APP_PORT is not defined in the environment variables');
-  }
-  await app.listen(port);
+  
+  // Set global prefix for all routes
+  app.setGlobalPrefix(configService.apiPrefix);
+  
+  // Enable validation
+  app.useGlobalPipes(new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true,
+  }));
+  
+  // Enable CORS
+  app.enableCors();
+  
+  await app.listen(configService.port);
+  
+  console.log(`🚀 Application is running on: ${await app.getUrl()}`);
 }
-
 bootstrap();
