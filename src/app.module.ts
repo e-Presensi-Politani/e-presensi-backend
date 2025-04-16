@@ -8,6 +8,7 @@ import { ConfigService } from './config/config.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { DepartmentsModule } from './departments/departments.module';
+import { AttendanceModule } from './attendance/attendance.module';
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { DepartmentsModule } from './departments/departments.module';
     }),
     UsersModule,
     AuthModule,
-    DepartmentsModule
+    DepartmentsModule,
+    AttendanceModule
   ],
   controllers: [AppController],
   providers: [AppService],
