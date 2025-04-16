@@ -1,6 +1,7 @@
 // src/config/config.service.ts
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
+import { GeoLocation } from 'src/common/interfaces/geo-location.interface';
 
 @Injectable()
 export class ConfigService {
@@ -90,10 +91,6 @@ export class ConfigService {
     return this.configService.get<number>('attendance.minWorkHoursForFullDay')!;
   }
 
-  get geofenceRadius(): number {
-    return this.configService.get<number>('attendance.geofenceRadius')!;
-  }
-
   // Email Configuration
   get emailConfig(): any {
     return this.configService.get<any>('email');
@@ -124,4 +121,19 @@ export class ConfigService {
   get s3Config(): any {
     return this.configService.get<any>('storage.s3');
   }
+
+  // Add these properties to your ConfigService class:
+
+// Reference point for geofencing (office location)
+get referencePoint(): GeoLocation {
+  return {
+    latitude: parseFloat(process.env.OFFICE_LATITUDE || '0'),
+    longitude: parseFloat(process.env.OFFICE_LONGITUDE || '0'),
+  };
+}
+
+// Radius for geofence in meters
+get geofenceRadius(): number {
+  return parseInt(process.env.GEOFENCE_RADIUS || '100', 10);
+}
 }
