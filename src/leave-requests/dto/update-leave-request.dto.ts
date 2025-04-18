@@ -13,12 +13,10 @@ export class UpdateLeaveRequestDto {
   @IsOptional()
   type?: LeaveRequestType;
 
-  @IsDateString()
   @IsOptional()
   @Transform(({ value }) => new Date(value))
   startDate?: Date;
 
-  @IsDateString()
   @IsOptional()
   @Transform(({ value }) => new Date(value))
   endDate?: Date;

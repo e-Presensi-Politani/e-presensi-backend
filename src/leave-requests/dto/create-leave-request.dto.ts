@@ -18,12 +18,10 @@ export class CreateLeaveRequestDto {
   @IsNotEmpty()
   type: LeaveRequestType;
 
-  @IsDateString()
   @IsNotEmpty()
   @Transform(({ value }) => new Date(value))
   startDate: Date;
 
-  @IsDateString()
   @IsNotEmpty()
   @Transform(({ value }) => new Date(value))
   endDate: Date;
