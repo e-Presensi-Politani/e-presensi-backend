@@ -3,16 +3,16 @@ import { Document } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 
 export enum LeaveRequestType {
-  LEAVE = 'LEAVE',           // Cuti
-  WFH = 'WFH',               // Work From Home
-  WFA = 'WFA',               // Work From Anywhere
-  DL = 'DL',                 // Dinas Luar
+  LEAVE = 'LEAVE', // Cuti
+  WFH = 'WFH', // Work From Home
+  WFA = 'WFA', // Work From Anywhere
+  DL = 'DL', // Dinas Luar
 }
 
 export enum LeaveRequestStatus {
-  PENDING = 'PENDING',       // Menunggu persetujuan
-  APPROVED = 'APPROVED',     // Disetujui
-  REJECTED = 'REJECTED',     // Ditolak
+  PENDING = 'PENDING', // Menunggu persetujuan
+  APPROVED = 'APPROVED', // Disetujui
+  REJECTED = 'REJECTED', // Ditolak
 }
 
 @Schema({ timestamps: true })
@@ -41,7 +41,11 @@ export class LeaveRequest extends Document {
   @Prop({ type: String })
   attachmentUrl: string;
 
-  @Prop({ required: true, enum: LeaveRequestStatus, default: LeaveRequestStatus.PENDING })
+  @Prop({
+    required: true,
+    enum: LeaveRequestStatus,
+    default: LeaveRequestStatus.PENDING,
+  })
   status: LeaveRequestStatus;
 
   @Prop({ type: String })

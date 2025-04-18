@@ -1,5 +1,15 @@
 // src/users/users.controller.ts
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -45,12 +55,12 @@ export class UsersController {
     return this.usersService.remove(guid);
   }
 
-// Add this endpoint temporarily to create the first admin user
-@Post('first-admin')
-async createFirstAdmin(@Body() createUserDto: CreateUserDto) {
-  // Force role to be admin
-  createUserDto.role = UserRole.ADMIN;
-  // Create the user
-  return this.usersService.create(createUserDto);
-}
+  // Add this endpoint temporarily to create the first admin user
+  @Post('first-admin')
+  async createFirstAdmin(@Body() createUserDto: CreateUserDto) {
+    // Force role to be admin
+    createUserDto.role = UserRole.ADMIN;
+    // Create the user
+    return this.usersService.create(createUserDto);
+  }
 }

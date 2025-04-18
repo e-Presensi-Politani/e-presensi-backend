@@ -28,7 +28,7 @@ import { LeaveRequestsModule } from './leave-requests/leave-requests.module';
     AuthModule,
     DepartmentsModule,
     AttendanceModule,
-    LeaveRequestsModule
+    LeaveRequestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

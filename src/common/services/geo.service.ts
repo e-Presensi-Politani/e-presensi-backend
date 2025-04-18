@@ -63,11 +63,11 @@ export class GeoService {
   parseLocation(locationString: string): GeoLocation | null {
     try {
       const [latitude, longitude] = locationString.split(',').map(Number);
-      
+
       if (isNaN(latitude) || isNaN(longitude)) {
         return null;
       }
-      
+
       return { latitude, longitude };
     } catch (error) {
       return null;

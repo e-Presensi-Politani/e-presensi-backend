@@ -244,7 +244,9 @@ export class LeaveRequestsService {
       .exec();
 
     if (!updatedLeaveRequest) {
-      throw new NotFoundException(`Leave request with GUID "${guid}" not found`);
+      throw new NotFoundException(
+        `Leave request with GUID "${guid}" not found`,
+      );
     }
 
     return updatedLeaveRequest;
@@ -271,9 +273,13 @@ export class LeaveRequestsService {
       );
     }
 
-    const deletedLeaveRequest = await this.leaveRequestModel.findOneAndDelete({ guid }).exec();
+    const deletedLeaveRequest = await this.leaveRequestModel
+      .findOneAndDelete({ guid })
+      .exec();
     if (!deletedLeaveRequest) {
-      throw new NotFoundException(`Leave request with GUID "${guid}" not found`);
+      throw new NotFoundException(
+        `Leave request with GUID "${guid}" not found`,
+      );
     }
     return deletedLeaveRequest;
   }
@@ -313,7 +319,9 @@ export class LeaveRequestsService {
       .exec();
 
     if (!updatedLeaveRequest) {
-      throw new NotFoundException(`Leave request with GUID "${guid}" not found`);
+      throw new NotFoundException(
+        `Leave request with GUID "${guid}" not found`,
+      );
     }
 
     return updatedLeaveRequest;

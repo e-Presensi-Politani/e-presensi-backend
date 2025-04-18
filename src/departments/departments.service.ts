@@ -1,5 +1,9 @@
 // departments/departments.service.ts
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Department, DepartmentDocument } from './schemas/department.schema';
@@ -11,7 +15,8 @@ import { AddMembersDto } from './dto/add-members.dto';
 @Injectable()
 export class DepartmentsService {
   constructor(
-    @InjectModel(Department.name) private departmentModel: Model<DepartmentDocument>,
+    @InjectModel(Department.name)
+    private departmentModel: Model<DepartmentDocument>,
   ) {}
 
   async create(createDepartmentDto: CreateDepartmentDto): Promise<Department> {
@@ -24,7 +29,9 @@ export class DepartmentsService {
     });
 
     if (existingDepartment) {
-      throw new ConflictException('Department with this name or code already exists');
+      throw new ConflictException(
+        'Department with this name or code already exists',
+      );
     }
 
     const createdDepartment = new this.departmentModel(createDepartmentDto);
@@ -55,11 +62,14 @@ export class DepartmentsService {
     return department;
   }
 
-  async update(guid: string, updateDepartmentDto: UpdateDepartmentDto): Promise<Department> {
+  async update(
+    guid: string,
+    updateDepartmentDto: UpdateDepartmentDto,
+  ): Promise<Department> {
     const department = await this.departmentModel
       .findOneAndUpdate({ guid }, updateDepartmentDto, { new: true })
       .exec();
-      
+
     if (!department) {
       throw new NotFoundException(`Department with GUID ${guid} not found`);
     }
@@ -71,7 +81,7 @@ export class DepartmentsService {
     const department = await this.departmentModel
       .findOneAndUpdate({ guid }, { isActive: false }, { new: true })
       .exec();
-      
+
     if (!department) {
       throw new NotFoundException(`Department with GUID ${guid} not found`);
     }
@@ -79,42 +89,53 @@ export class DepartmentsService {
   }
 
   async hardRemove(guid: string): Promise<Department> {
-    const department = await this.departmentModel.findOneAndDelete({ guid }).exec();
+    const department = await this.departmentModel
+      .findOneAndDelete({ guid })
+      .exec();
     if (!department) {
       throw new NotFoundException(`Department with GUID ${guid} not found`);
     }
     return department;
   }
 
-  async assignHead(guid: string, assignHeadDto: AssignHeadDto): Promise<Department> {
+  async assignHead(
+    guid: string,
+    assignHeadDto: AssignHeadDto,
+  ): Promise<Department> {
     const department = await this.departmentModel
       .findOneAndUpdate(
         { guid },
         { headId: assignHeadDto.userId },
-        { new: true }
+        { new: true },
       )
       .exec();
-      
+
     if (!department) {
       throw new NotFoundException(`Department with GUID ${guid} not found`);
     }
     return department;
   }
 
-  async addMembers(guid: string, addMembersDto: AddMembersDto): Promise<Department> {
+  async addMembers(
+    guid: string,
+    addMembersDto: AddMembersDto,
+  ): Promise<Department> {
     const department = await this.departmentModel.findOne({ guid }).exec();
     if (!department) {
       throw new NotFoundException(`Department with GUID ${guid} not found`);
     }
 
     // Filter out duplicates
-    const uniqueMembers = new Set([...department.memberIds, ...addMembersDto.userIds]);
-    
+    const uniqueMembers = new Set([
+      ...department.memberIds,
+      ...addMembersDto.userIds,
+    ]);
+
     const updatedDepartment = await this.departmentModel
       .findOneAndUpdate(
         { guid },
         { memberIds: Array.from(uniqueMembers) },
-        { new: true }
+        { new: true },
       )
       .exec();
 
@@ -125,7 +146,10 @@ export class DepartmentsService {
     return updatedDepartment;
   }
 
-  async removeMembers(guid: string, addMembersDto: AddMembersDto): Promise<Department> {
+  async removeMembers(
+    guid: string,
+    addMembersDto: AddMembersDto,
+  ): Promise<Department> {
     const department = await this.departmentModel.findOne({ guid }).exec();
     if (!department) {
       throw new NotFoundException(`Department with GUID ${guid} not found`);
@@ -133,15 +157,11 @@ export class DepartmentsService {
 
     // Filter out the members to remove
     const updatedMembers = department.memberIds.filter(
-      id => !addMembersDto.userIds.includes(id)
+      (id) => !addMembersDto.userIds.includes(id),
     );
-    
+
     const updatedDepartment = await this.departmentModel
-      .findOneAndUpdate(
-        { guid },
-        { memberIds: updatedMembers },
-        { new: true }
-      )
+      .findOneAndUpdate({ guid }, { memberIds: updatedMembers }, { new: true })
       .exec();
 
     if (!updatedDepartment) {
@@ -154,11 +174,8 @@ export class DepartmentsService {
   async getDepartmentsByMember(userId: string): Promise<Department[]> {
     return this.departmentModel
       .find({
-        $or: [
-          { headId: userId },
-          { memberIds: userId }
-        ],
-        isActive: true
+        $or: [{ headId: userId }, { memberIds: userId }],
+        isActive: true,
       })
       .exec();
   }
@@ -167,7 +184,7 @@ export class DepartmentsService {
     return this.departmentModel
       .find({
         headId: userId,
-        isActive: true
+        isActive: true,
       })
       .exec();
   }

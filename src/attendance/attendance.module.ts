@@ -13,7 +13,7 @@ import { DepartmentsModule } from '../departments/departments.module';
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: Attendance.name, schema: AttendanceSchema }
+      { name: Attendance.name, schema: AttendanceSchema },
     ]),
     MulterModule.register({
       dest: './uploads/attendance',

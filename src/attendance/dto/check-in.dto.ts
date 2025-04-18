@@ -15,7 +15,7 @@ export class CheckInDto {
 
   @IsOptional()
   @IsNumber()
-  @Transform(({ value }) => value ? parseFloat(value) : undefined)
+  @Transform(({ value }) => (value ? parseFloat(value) : undefined))
   accuracy?: number;
 
   @IsOptional()

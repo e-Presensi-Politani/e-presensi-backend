@@ -52,10 +52,10 @@ export class User {
     address?: string;
     emergencyContact?: string;
   };
-  
+
   @Prop()
   createdAt: Date;
-  
+
   @Prop()
   updatedAt: Date;
 }

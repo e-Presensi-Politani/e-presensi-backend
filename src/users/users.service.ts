@@ -1,5 +1,9 @@
 // src/users/users.service.ts
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
@@ -18,14 +22,13 @@ export class UsersService {
   async create(createUserDto: CreateUserDto): Promise<User> {
     // Check if user with email or NIP already exists
     const existingUser = await this.userModel.findOne({
-      $or: [
-        { email: createUserDto.email },
-        { nip: createUserDto.nip }
-      ]
+      $or: [{ email: createUserDto.email }, { nip: createUserDto.nip }],
     });
 
     if (existingUser) {
-      throw new BadRequestException('User with this email or NIP already exists');
+      throw new BadRequestException(
+        'User with this email or NIP already exists',
+      );
     }
 
     // Hash the password
@@ -73,22 +76,22 @@ export class UsersService {
 
     // If updating email or nip, check if they already exist for another user
     if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const emailExists = await this.userModel.findOne({ 
+      const emailExists = await this.userModel.findOne({
         email: updateUserDto.email,
-        guid: { $ne: guid }
+        guid: { $ne: guid },
       });
-      
+
       if (emailExists) {
         throw new BadRequestException('Email already in use');
       }
     }
 
     if (updateUserDto.nip && updateUserDto.nip !== user.nip) {
-      const nipExists = await this.userModel.findOne({ 
+      const nipExists = await this.userModel.findOne({
         nip: updateUserDto.nip,
-        guid: { $ne: guid }
+        guid: { $ne: guid },
       });
-      
+
       if (nipExists) {
         throw new BadRequestException('NIP already in use');
       }
@@ -99,11 +102,9 @@ export class UsersService {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
 
-    const updatedUser = await this.userModel.findOneAndUpdate(
-      { guid },
-      { $set: updateUserDto },
-      { new: true }
-    ).exec();
+    const updatedUser = await this.userModel
+      .findOneAndUpdate({ guid }, { $set: updateUserDto }, { new: true })
+      .exec();
 
     if (!updatedUser) {
       throw new NotFoundException(`User with guid ${guid} not found`);
@@ -121,11 +122,11 @@ export class UsersService {
 
   async validateUser(email: string, password: string): Promise<User | null> {
     const user = await this.userModel.findOne({ email }).exec();
-    
-    if (user && await bcrypt.compare(password, user.password)) {
+
+    if (user && (await bcrypt.compare(password, user.password))) {
       return user;
     }
-    
+
     return null;
   }
 }

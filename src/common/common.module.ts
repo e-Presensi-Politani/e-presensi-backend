@@ -6,10 +6,7 @@ import { ConfigModule } from '../config/config.module';
 import { DepartmentsModule } from '../departments/departments.module';
 
 @Module({
-  imports: [
-    ConfigModule,
-    DepartmentsModule
-  ],
+  imports: [ConfigModule, DepartmentsModule],
   providers: [GeoService, DepartmentHeadGuard],
   exports: [GeoService, DepartmentHeadGuard],
 })

@@ -1,5 +1,9 @@
 // src/attendance/attendance.service.ts
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Attendance, AttendanceDocument } from './schemas/attendance.schema';
@@ -17,7 +21,8 @@ import * as moment from 'moment';
 @Injectable()
 export class AttendanceService {
   constructor(
-    @InjectModel(Attendance.name) private attendanceModel: Model<AttendanceDocument>,
+    @InjectModel(Attendance.name)
+    private attendanceModel: Model<AttendanceDocument>,
     private geoService: GeoService,
     private configService: ConfigService,
     private usersService: UsersService,
@@ -30,7 +35,11 @@ export class AttendanceService {
    * @param checkInDto Check-in data
    * @param photoPath Path to uploaded photo (if any)
    */
-  async checkIn(userId: string, checkInDto: CheckInDto, photoPath?: string): Promise<Attendance> {
+  async checkIn(
+    userId: string,
+    checkInDto: CheckInDto,
+    photoPath?: string,
+  ): Promise<Attendance> {
     const user = await this.usersService.findOne(userId);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -49,7 +58,8 @@ export class AttendanceService {
     }
 
     // Get user's departments
-    const departments = await this.departmentsService.getDepartmentsByMember(userId);
+    const departments =
+      await this.departmentsService.getDepartmentsByMember(userId);
     let departmentId: string | null = null;
     if (departments.length > 0) {
       departmentId = departments[0].guid;
@@ -64,7 +74,7 @@ export class AttendanceService {
     };
 
     const isWithinGeofence = this.geoService.isWithinGeofence(location);
-    
+
     // Determine status based on check-in time and location
     const now = new Date();
     const currentHour = now.getHours();
@@ -72,8 +82,8 @@ export class AttendanceService {
 
     // Assuming work starts at 8:00 AM
     const lateToleranceMinutes = this.configService.lateToleranceMinutes;
-    const isLate = 
-      (currentHour > 8) || 
+    const isLate =
+      currentHour > 8 ||
       (currentHour === 8 && currentMinutes > lateToleranceMinutes);
 
     let status = WorkingStatus.PRESENT;
@@ -113,7 +123,11 @@ export class AttendanceService {
    * @param checkOutDto Check-out data
    * @param photoPath Path to uploaded photo (if any)
    */
-  async checkOut(userId: string, checkOutDto: CheckOutDto, photoPath?: string): Promise<Attendance> {
+  async checkOut(
+    userId: string,
+    checkOutDto: CheckOutDto,
+    photoPath?: string,
+  ): Promise<Attendance> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -144,19 +158,21 @@ export class AttendanceService {
 
     const now = new Date();
     const checkInTime = attendance.checkInTime;
-    
+
     // Calculate work hours
-    const workHours = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
-    
+    const workHours =
+      (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+
     // Check if checking out early
     // Assuming work ends at 5:00 PM
     const currentHour = now.getHours();
     const currentMinutes = now.getMinutes();
-    const earlyLeaveToleranceMinutes = this.configService.earlyLeaveToleranceMinutes;
-    
-    const isEarlyDeparture = 
-      (currentHour < 17) || 
-      (currentHour === 17 && currentMinutes < (0 - earlyLeaveToleranceMinutes));
+    const earlyLeaveToleranceMinutes =
+      this.configService.earlyLeaveToleranceMinutes;
+
+    const isEarlyDeparture =
+      currentHour < 17 ||
+      (currentHour === 17 && currentMinutes < 0 - earlyLeaveToleranceMinutes);
 
     let status = attendance.status;
     if (isEarlyDeparture && status === WorkingStatus.PRESENT) {
@@ -170,7 +186,7 @@ export class AttendanceService {
     attendance.checkOutNotes = checkOutDto.notes ?? '';
     attendance.workHours = parseFloat(workHours.toFixed(2));
     attendance.status = status;
-    
+
     return attendance.save();
   }
 
@@ -181,12 +197,14 @@ export class AttendanceService {
    * @param verifyDto Verification data
    */
   async verifyAttendance(
-    attendanceId: string, 
-    verifierUserId: string, 
-    verifyDto: VerifyAttendanceDto
+    attendanceId: string,
+    verifierUserId: string,
+    verifyDto: VerifyAttendanceDto,
   ): Promise<Attendance> {
-    const attendance = await this.attendanceModel.findOne({ guid: attendanceId });
-    
+    const attendance = await this.attendanceModel.findOne({
+      guid: attendanceId,
+    });
+
     if (!attendance) {
       throw new NotFoundException('Attendance record not found');
     }
@@ -194,7 +212,7 @@ export class AttendanceService {
     attendance.verified = verifyDto.verified;
     attendance.verifiedBy = verifierUserId;
     attendance.verifiedAt = new Date();
-    
+
     return attendance.save();
   }
 
@@ -219,11 +237,11 @@ export class AttendanceService {
 
     if (queryDto.startDate || queryDto.endDate) {
       query.date = {};
-      
+
       if (queryDto.startDate) {
         query.date.$gte = new Date(queryDto.startDate);
       }
-      
+
       if (queryDto.endDate) {
         const endDate = new Date(queryDto.endDate);
         endDate.setHours(23, 59, 59, 999);
@@ -240,11 +258,13 @@ export class AttendanceService {
    */
   async findOne(guid: string): Promise<Attendance> {
     const attendance = await this.attendanceModel.findOne({ guid }).exec();
-    
+
     if (!attendance) {
-      throw new NotFoundException(`Attendance record with GUID ${guid} not found`);
+      throw new NotFoundException(
+        `Attendance record with GUID ${guid} not found`,
+      );
     }
-    
+
     return attendance;
   }
 
@@ -256,13 +276,15 @@ export class AttendanceService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    return this.attendanceModel.findOne({
-      userId,
-      date: {
-        $gte: today,
-        $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000), // Next day
-      },
-    }).exec();
+    return this.attendanceModel
+      .findOne({
+        userId,
+        date: {
+          $gte: today,
+          $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000), // Next day
+        },
+      })
+      .exec();
   }
 
   /**
@@ -273,10 +295,10 @@ export class AttendanceService {
    * @param departmentId Optional department GUID for filtering
    */
   async getAttendanceSummary(
-    startDate: Date, 
-    endDate: Date, 
-    userId?: string, 
-    departmentId?: string
+    startDate: Date,
+    endDate: Date,
+    userId?: string,
+    departmentId?: string,
   ): Promise<any> {
     const query: any = {
       date: {
@@ -310,7 +332,7 @@ export class AttendanceService {
     };
 
     // Count by status
-    attendanceRecords.forEach(record => {
+    attendanceRecords.forEach((record) => {
       switch (record.status) {
         case WorkingStatus.PRESENT:
           summary.present++;
@@ -345,15 +367,17 @@ export class AttendanceService {
     const daysWithRecords = attendanceRecords.length;
     if (daysWithRecords > 0) {
       summary.averageWorkHours = summary.totalWorkHours / daysWithRecords;
-      summary.averageWorkHours = parseFloat(summary.averageWorkHours.toFixed(2));
+      summary.averageWorkHours = parseFloat(
+        summary.averageWorkHours.toFixed(2),
+      );
     }
 
     // Add total attendances (excluding absences)
-    summary.totalAttendances = 
-      summary.present + 
-      summary.late + 
-      summary.earlyDeparture + 
-      summary.remoteWorking + 
+    summary.totalAttendances =
+      summary.present +
+      summary.late +
+      summary.earlyDeparture +
+      summary.remoteWorking +
       summary.officialTravel;
 
     return summary;

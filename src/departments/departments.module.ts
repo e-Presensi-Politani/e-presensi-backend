@@ -8,11 +8,11 @@ import { Department, DepartmentSchema } from './schemas/department.schema';
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: Department.name, schema: DepartmentSchema }
-    ])
+      { name: Department.name, schema: DepartmentSchema },
+    ]),
   ],
   controllers: [DepartmentsController],
   providers: [DepartmentsService],
-  exports: [DepartmentsService]
+  exports: [DepartmentsService],
 })
 export class DepartmentsModule {}

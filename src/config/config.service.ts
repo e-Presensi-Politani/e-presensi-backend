@@ -124,16 +124,16 @@ export class ConfigService {
 
   // Add these properties to your ConfigService class:
 
-// Reference point for geofencing (office location)
-get referencePoint(): GeoLocation {
-  return {
-    latitude: parseFloat(process.env.OFFICE_LATITUDE || '0'),
-    longitude: parseFloat(process.env.OFFICE_LONGITUDE || '0'),
-  };
-}
+  // Reference point for geofencing (office location)
+  get referencePoint(): GeoLocation {
+    return {
+      latitude: parseFloat(process.env.OFFICE_LATITUDE || '0'),
+      longitude: parseFloat(process.env.OFFICE_LONGITUDE || '0'),
+    };
+  }
 
-// Radius for geofence in meters
-get geofenceRadius(): number {
-  return parseInt(process.env.GEOFENCE_RADIUS || '100', 10);
-}
+  // Radius for geofence in meters
+  get geofenceRadius(): number {
+    return parseInt(process.env.GEOFENCE_RADIUS || '100', 10);
+  }
 }
