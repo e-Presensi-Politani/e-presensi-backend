@@ -176,31 +176,29 @@ export class LeaveRequestsController {
   @Post(':guid/review')
   @Post(':guid/review')
   @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.ADMIN, UserRole.KAJUR)  // Explicitly allowing KAJUR role
+  @Roles(UserRole.ADMIN, UserRole.KAJUR) // Explicitly allowing KAJUR role
   async reviewRequest(
     @Request() req,
     @Param('guid') guid: string,
     @Body() reviewDto: ReviewLeaveRequestDto,
   ) {
     const leaveRequest = await this.leaveRequestsService.findOne(guid);
-  
+
     // Additional permission check for KAJUR
     if (req.user.role === UserRole.KAJUR) {
       const departments = await this.departmentsService.getDepartmentByHead(
         req.user.guid,
       );
-      
-      // Log for debugging
-      console.log('User departments:', departments);
-      console.log('Leave request department:', leaveRequest);
-      
-      if (!departments.some((dept) => dept.guid === leaveRequest.departmentId)) {
+
+      if (
+        !departments.some((dept) => dept.guid === leaveRequest.departmentId)
+      ) {
         throw new ForbiddenException(
           'You do not have permission to review this leave request',
         );
       }
     }
-  
+
     return this.leaveRequestsService.reviewRequest(
       guid,
       req.user.guid,
