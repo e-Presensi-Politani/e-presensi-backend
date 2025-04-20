@@ -1,5 +1,11 @@
 // src/statistics/dto/generate-report.dto.ts
-import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { ReportFormat, ReportPeriod } from './statistics-query.dto';
 
 export class GenerateReportDto {

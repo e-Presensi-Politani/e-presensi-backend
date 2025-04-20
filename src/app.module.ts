@@ -12,6 +12,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { LeaveRequestsModule } from './leave-requests/leave-requests.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { CorrectionsModule } from './corrections/corrections.module';
+import { FilesModule } from './files/files.module';
 
 @Module({
   imports: [
@@ -32,7 +33,8 @@ import { CorrectionsModule } from './corrections/corrections.module';
     AttendanceModule,
     LeaveRequestsModule,
     StatisticsModule,
-    CorrectionsModule
+    CorrectionsModule,
+    FilesModule
   ],
   controllers: [AppController],
   providers: [AppService],

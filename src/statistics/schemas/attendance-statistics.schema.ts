@@ -66,4 +66,5 @@ export class AttendanceStatistics extends Document {
   averageWorkingHours: number;
 }
 
-export const AttendanceStatisticsSchema = SchemaFactory.createForClass(AttendanceStatistics);
+export const AttendanceStatisticsSchema =
+  SchemaFactory.createForClass(AttendanceStatistics);

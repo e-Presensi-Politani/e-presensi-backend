@@ -22,7 +22,7 @@ export enum CorrectionStatus {
 @Schema({ timestamps: true })
 export class Correction {
   save(): Correction | PromiseLike<Correction> {
-      throw new Error('Method not implemented.');
+    throw new Error('Method not implemented.');
   }
   @Prop({ type: String, default: () => uuidv4() })
   guid: string;
