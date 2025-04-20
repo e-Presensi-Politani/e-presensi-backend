@@ -1,5 +1,7 @@
+// src/leave-requests/leave-requests.module.ts
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { MulterModule } from '@nestjs/platform-express';
 import { LeaveRequestsController } from './leave-requests.controller';
 import { LeaveRequestsService } from './leave-requests.service';
 import {
@@ -16,10 +18,13 @@ import { FilesModule } from '../files/files.module';
     MongooseModule.forFeature([
       { name: LeaveRequest.name, schema: LeaveRequestSchema },
     ]),
+    MulterModule.register({
+      dest: './uploads/permission',
+    }),
     DepartmentsModule,
     UsersModule,
     CommonModule,
-    FilesModule, // Add the FilesModule
+    FilesModule,
   ],
   controllers: [LeaveRequestsController],
   providers: [LeaveRequestsService],

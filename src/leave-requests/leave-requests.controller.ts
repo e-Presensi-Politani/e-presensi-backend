@@ -1,3 +1,4 @@
+// src/leave-requests/leave-requests.controller.ts
 import {
   Controller,
   Get,
@@ -15,6 +16,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { LeaveRequestsService } from './leave-requests.service';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { UpdateLeaveRequestDto } from './dto/update-leave-request.dto';
@@ -38,7 +42,26 @@ export class LeaveRequestsController {
   ) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('attachment'))
+  @UseInterceptors(
+    FileInterceptor('attachment', {
+      storage: diskStorage({
+        destination: './uploads/permission',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4();
+          const ext = extname(file.originalname);
+          cb(null, `permission-${uniqueSuffix}${ext}`);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        // Add file type validation if needed
+        // For example, only accepting PDFs, images, etc.
+        cb(null, true);
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+    }),
+  )
   async create(
     @Request() req,
     @Body() createLeaveRequestDto: CreateLeaveRequestDto,
@@ -49,7 +72,7 @@ export class LeaveRequestsController {
       throw new BadRequestException('Attachment file is required');
     }
 
-    // Upload file and get metadata
+    // Save file metadata to Files service
     const fileMetadata = await this.filesService.saveFileMetadata({
       fileName: file.filename,
       originalName: file.originalname,
@@ -58,7 +81,6 @@ export class LeaveRequestsController {
       path: file.path,
       category: FileCategory.PERMISSION,
       userId: req.user.guid,
-      isTemporary: false,
     });
 
     // Create leave request with attachment reference
@@ -203,7 +225,25 @@ export class LeaveRequestsController {
   }
 
   @Patch(':guid')
-  @UseInterceptors(FileInterceptor('attachment'))
+  @UseInterceptors(
+    FileInterceptor('attachment', {
+      storage: diskStorage({
+        destination: './uploads/permission',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4();
+          const ext = extname(file.originalname);
+          cb(null, `permission-update-${uniqueSuffix}${ext}`);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        // Add file type validation if needed
+        cb(null, true);
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+    }),
+  )
   async update(
     @Request() req,
     @Param('guid') guid: string,
@@ -224,7 +264,6 @@ export class LeaveRequestsController {
         path: file.path,
         category: FileCategory.PERMISSION,
         userId: req.user.guid,
-        isTemporary: false,
       });
 
       // Update attachment ID
@@ -268,7 +307,7 @@ export class LeaveRequestsController {
   }
 
   @Post(':guid/review')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.KAJUR) // Explicitly allowing KAJUR role
   async reviewRequest(
     @Request() req,
