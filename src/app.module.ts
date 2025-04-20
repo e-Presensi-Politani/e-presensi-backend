@@ -11,6 +11,7 @@ import { DepartmentsModule } from './departments/departments.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { LeaveRequestsModule } from './leave-requests/leave-requests.module';
 import { StatisticsModule } from './statistics/statistics.module';
+import { CorrectionsModule } from './corrections/corrections.module';
 
 @Module({
   imports: [
@@ -30,7 +31,8 @@ import { StatisticsModule } from './statistics/statistics.module';
     DepartmentsModule,
     AttendanceModule,
     LeaveRequestsModule,
-    StatisticsModule
+    StatisticsModule,
+    CorrectionsModule
   ],
   controllers: [AppController],
   providers: [AppService],

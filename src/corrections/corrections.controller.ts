@@ -19,12 +19,15 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/schemas/user.schema';
-import { DepartmentHeadGuard } from '../common/guards/department-head.guard';
+import { DepartmentsService } from '../departments/departments.service';
 
 @Controller('corrections')
 @UseGuards(JwtAuthGuard)
 export class CorrectionsController {
-  constructor(private readonly correctionsService: CorrectionsService) {}
+  constructor(
+    private readonly correctionsService: CorrectionsService,
+    private readonly departmentsService: DepartmentsService,
+  ) {}
 
   @Post()
   async create(
@@ -35,10 +38,35 @@ export class CorrectionsController {
   }
 
   @Get()
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.KAJUR)
-  async findAll(@Query() query: CorrectionQueryDto) {
-    return this.correctionsService.findAll(query);
+  async findAll(@Request() req, @Query() query: CorrectionQueryDto) {
+    // For ADMIN, return all corrections based on query
+    if (req.user.role === UserRole.ADMIN) {
+      return this.correctionsService.findAll(query);
+    }
+
+    // For KAJUR, return corrections for their department
+    if (req.user.role === UserRole.KAJUR) {
+      const departments = await this.departmentsService.getDepartmentByHead(
+        req.user.guid,
+      );
+      const departmentIds = departments.map((dept) => dept.guid);
+
+      // If departmentId is specified in query, ensure it's one of the user's departments
+      if (query.departmentId && !departmentIds.includes(query.departmentId)) {
+        throw new ForbiddenException(
+          'You can only view corrections for departments you lead',
+        );
+      }
+
+      // Restrict to only the departments they lead
+      return this.correctionsService.findAll({
+        ...query,
+        departmentId: query.departmentId || departmentIds[0],
+      });
+    }
+
+    // For regular users, only return their own corrections
+    return this.correctionsService.findUserCorrections(req.user.guid, query);
   }
 
   @Get('my-requests')
@@ -52,22 +80,23 @@ export class CorrectionsController {
   }
 
   @Get('department/:departmentId/pending')
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard)
   @Roles(UserRole.ADMIN, UserRole.KAJUR)
   async findPendingByDepartment(
     @Param('departmentId') departmentId: string,
     @Request() req,
   ) {
-    // If admin, allow access to any department
+    // For admin, allow access to any department
     if (req.user.role === UserRole.ADMIN) {
       return this.correctionsService.findPendingByDepartment(departmentId);
     }
 
     // For department heads, check if they are the head of the requested department
-    const departmentsHeaded = await this.correctionsService[
-      'departmentsService'
-    ].getDepartmentByHead(req.user.guid);
-    const isHeadOfDepartment = departmentsHeaded.some(
+    const departments = await this.departmentsService.getDepartmentByHead(
+      req.user.guid,
+    );
+
+    const isHeadOfDepartment = departments.some(
       (dept) => dept.guid === departmentId,
     );
 
@@ -81,18 +110,59 @@ export class CorrectionsController {
   }
 
   @Get(':guid')
-  async findOne(@Param('guid') guid: string) {
-    return this.correctionsService.findOne(guid);
+  async findOne(@Request() req, @Param('guid') guid: string) {
+    const correction = await this.correctionsService.findOne(guid);
+
+    // Check permissions
+    if (
+      req.user.role !== UserRole.ADMIN &&
+      correction.userId !== req.user.guid
+    ) {
+      // For department heads, check if they lead the department
+      if (req.user.role === UserRole.KAJUR) {
+        const departments = await this.departmentsService.getDepartmentByHead(
+          req.user.guid,
+        );
+        if (
+          !departments.some((dept) => dept.guid === correction.departmentId)
+        ) {
+          throw new ForbiddenException(
+            'You do not have permission to view this correction',
+          );
+        }
+      } else {
+        throw new ForbiddenException(
+          'You do not have permission to view this correction',
+        );
+      }
+    }
+
+    return correction;
   }
 
   @Put(':guid/review')
-  @UseGuards(RolesGuard, DepartmentHeadGuard)
+  @UseGuards(JwtAuthGuard)
   @Roles(UserRole.ADMIN, UserRole.KAJUR)
   async reviewCorrection(
     @Param('guid') guid: string,
     @Request() req,
     @Body() updateCorrectionDto: UpdateCorrectionDto,
   ) {
+    const correction = await this.correctionsService.findOne(guid);
+
+    // Additional permission check for KAJUR
+    if (req.user.role === UserRole.KAJUR) {
+      const departments = await this.departmentsService.getDepartmentByHead(
+        req.user.guid,
+      );
+
+      if (!departments.some((dept) => dept.guid === correction.departmentId)) {
+        throw new ForbiddenException(
+          'You do not have permission to review this correction request',
+        );
+      }
+    }
+
     return this.correctionsService.reviewCorrection(
       guid,
       req.user.guid,
