@@ -15,6 +15,7 @@ import { GeoService } from '../common/services/geo.service';
 import { ConfigService } from '../config/config.service';
 import { UsersService } from '../users/users.service';
 import { DepartmentsService } from '../departments/departments.service';
+import { FilesService } from '../files/files.service';
 import { WorkingStatus } from '../common/interfaces/working-status.enum';
 import * as moment from 'moment';
 
@@ -27,18 +28,19 @@ export class AttendanceService {
     private configService: ConfigService,
     private usersService: UsersService,
     private departmentsService: DepartmentsService,
+    private filesService: FilesService,
   ) {}
 
   /**
    * Record a check-in for a user
    * @param userId User GUID
    * @param checkInDto Check-in data
-   * @param photoPath Path to uploaded photo (if any)
+   * @param photoFileGuid GUID of the uploaded photo file (if any)
    */
   async checkIn(
     userId: string,
     checkInDto: CheckInDto,
-    photoPath?: string,
+    photoFileGuid?: string,
   ): Promise<Attendance> {
     const user = await this.usersService.findOne(userId);
     const today = new Date();
@@ -97,9 +99,18 @@ export class AttendanceService {
     if (existingAttendance) {
       existingAttendance.checkInTime = now;
       existingAttendance.checkInLocation = location;
-      existingAttendance.checkInPhoto = photoPath ?? '';
+      existingAttendance.checkInPhotoId = photoFileGuid || '';
       existingAttendance.checkInNotes = checkInDto.notes ?? '';
       existingAttendance.status = status;
+
+      // If there's a photo, link it to this attendance record
+      if (photoFileGuid) {
+        await this.filesService.updateFileRelation(
+          photoFileGuid,
+          existingAttendance.guid,
+        );
+      }
+
       return existingAttendance.save();
     } else {
       const attendance = new this.attendanceModel({
@@ -107,13 +118,23 @@ export class AttendanceService {
         date: today,
         checkInTime: now,
         checkInLocation: location,
-        checkInPhoto: photoPath,
+        checkInPhotoId: photoFileGuid,
         checkInNotes: checkInDto.notes,
         status,
         departmentId,
       });
 
-      return attendance.save();
+      const savedAttendance = await attendance.save();
+
+      // If there's a photo, link it to this attendance record
+      if (photoFileGuid) {
+        await this.filesService.updateFileRelation(
+          photoFileGuid,
+          savedAttendance.guid,
+        );
+      }
+
+      return savedAttendance;
     }
   }
 
@@ -121,12 +142,12 @@ export class AttendanceService {
    * Record a check-out for a user
    * @param userId User GUID
    * @param checkOutDto Check-out data
-   * @param photoPath Path to uploaded photo (if any)
+   * @param photoFileGuid GUID of the uploaded photo file (if any)
    */
   async checkOut(
     userId: string,
     checkOutDto: CheckOutDto,
-    photoPath?: string,
+    photoFileGuid?: string,
   ): Promise<Attendance> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -182,12 +203,22 @@ export class AttendanceService {
     // Update attendance record
     attendance.checkOutTime = now;
     attendance.checkOutLocation = location;
-    attendance.checkOutPhoto = photoPath ?? '';
+    attendance.checkOutPhotoId = photoFileGuid || '';
     attendance.checkOutNotes = checkOutDto.notes ?? '';
     attendance.workHours = parseFloat(workHours.toFixed(2));
     attendance.status = status;
 
-    return attendance.save();
+    const updatedAttendance = await attendance.save();
+
+    // If there's a photo, link it to this attendance record
+    if (photoFileGuid) {
+      await this.filesService.updateFileRelation(
+        photoFileGuid,
+        updatedAttendance.guid,
+      );
+    }
+
+    return updatedAttendance;
   }
 
   /**

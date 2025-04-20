@@ -27,6 +27,9 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/schemas/user.schema';
 import { DepartmentHeadGuard } from '../common/guards/department-head.guard';
 import { ConfigService } from '../config/config.service';
+import { FilesService } from '../files/files.service';
+import { FileCategory } from '../files/interfaces/file-category.enum';
+import { v4 as uuidv4 } from 'uuid';
 
 @Controller('attendance')
 @UseGuards(JwtAuthGuard)
@@ -34,6 +37,7 @@ export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,
     private readonly configService: ConfigService,
+    private readonly filesService: FilesService,
   ) {}
 
   @Post('check-in')
@@ -42,8 +46,7 @@ export class AttendanceController {
       storage: diskStorage({
         destination: './uploads/attendance',
         filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const uniqueSuffix = uuidv4();
           const ext = extname(file.originalname);
           cb(null, `checkin-${uniqueSuffix}${ext}`);
         },
@@ -69,8 +72,24 @@ export class AttendanceController {
     @Body() checkInDto: CheckInDto,
     @UploadedFile() photo,
   ) {
-    const photoPath = photo ? photo.path : undefined;
-    return this.attendanceService.checkIn(req.user.guid, checkInDto, photoPath);
+    let fileGuid: string | undefined = undefined;
+
+    if (photo) {
+      // Save file metadata to Files service
+      const fileMetadata = await this.filesService.saveFileMetadata({
+        fileName: photo.filename,
+        originalName: photo.originalname,
+        mimeType: photo.mimetype,
+        size: photo.size,
+        path: photo.path,
+        category: FileCategory.ATTENDANCE,
+        userId: req.user.guid,
+      });
+
+      fileGuid = fileMetadata.guid;
+    }
+
+    return this.attendanceService.checkIn(req.user.guid, checkInDto, fileGuid);
   }
 
   @Post('check-out')
@@ -79,8 +98,7 @@ export class AttendanceController {
       storage: diskStorage({
         destination: './uploads/attendance',
         filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const uniqueSuffix = uuidv4();
           const ext = extname(file.originalname);
           cb(null, `checkout-${uniqueSuffix}${ext}`);
         },
@@ -106,11 +124,27 @@ export class AttendanceController {
     @Body() checkOutDto: CheckOutDto,
     @UploadedFile() photo,
   ) {
-    const photoPath = photo ? photo.path : undefined;
+    let fileGuid: string | undefined = undefined;
+
+    if (photo) {
+      // Save file metadata to Files service
+      const fileMetadata = await this.filesService.saveFileMetadata({
+        fileName: photo.filename,
+        originalName: photo.originalname,
+        mimeType: photo.mimetype,
+        size: photo.size,
+        path: photo.path,
+        category: FileCategory.ATTENDANCE,
+        userId: req.user.guid,
+      });
+
+      fileGuid = fileMetadata.guid;
+    }
+
     return this.attendanceService.checkOut(
       req.user.guid,
       checkOutDto,
-      photoPath,
+      fileGuid,
     );
   }
 

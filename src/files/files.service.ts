@@ -32,6 +32,23 @@ export class FilesService {
   }
 
   /**
+   * Update file relation (associate file with a resource)
+   * @param fileGuid File GUID
+   * @param relatedId Related resource ID
+   * @returns Updated file document
+   */
+  async updateFileRelation(fileGuid: string, relatedId: string): Promise<File> {
+    const file = await this.fileModel.findOne({ guid: fileGuid }).exec();
+
+    if (!file) {
+      throw new NotFoundException(`File with GUID ${fileGuid} not found`);
+    }
+
+    file.relatedId = relatedId;
+    return file.save();
+  }
+
+  /**
    * Find all files based on query parameters
    * @param queryDto Query parameters
    * @returns Array of file documents

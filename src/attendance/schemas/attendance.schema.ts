@@ -38,8 +38,8 @@ export class Attendance {
   @Prop({ type: LocationRecord })
   checkInLocation: LocationRecord;
 
-  @Prop({ type: String })
-  checkInPhoto: string;
+  @Prop({ type: String, ref: 'File' })
+  checkInPhotoId: string;
 
   @Prop({ type: String })
   checkInNotes: string;
@@ -50,8 +50,8 @@ export class Attendance {
   @Prop({ type: LocationRecord })
   checkOutLocation: LocationRecord;
 
-  @Prop({ type: String })
-  checkOutPhoto: string;
+  @Prop({ type: String, ref: 'File' })
+  checkOutPhotoId: string;
 
   @Prop({ type: String })
   checkOutNotes: string;

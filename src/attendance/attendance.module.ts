@@ -9,6 +9,7 @@ import { CommonModule } from '../common/common.module';
 import { ConfigModule } from '../config/config.module';
 import { UsersModule } from '../users/users.module';
 import { DepartmentsModule } from '../departments/departments.module';
+import { FilesModule } from '../files/files.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { DepartmentsModule } from '../departments/departments.module';
     ConfigModule,
     UsersModule,
     DepartmentsModule,
+    FilesModule,
   ],
   controllers: [AttendanceController],
   providers: [AttendanceService],
