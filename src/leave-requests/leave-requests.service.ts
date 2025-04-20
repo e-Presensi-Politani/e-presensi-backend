@@ -32,6 +32,7 @@ export class LeaveRequestsService {
   async create(
     userId: string,
     createLeaveRequestDto: CreateLeaveRequestDto,
+    attachmentId: string,
   ): Promise<LeaveRequest> {
     // Validate date range
     if (
@@ -70,11 +71,12 @@ export class LeaveRequestsService {
       );
     }
 
-    // Create new leave request
+    // Create new leave request with attachment reference
     const leaveRequest = new this.leaveRequestModel({
       ...createLeaveRequestDto,
       userId,
       status: LeaveRequestStatus.PENDING,
+      attachmentId, // Set the attachment ID
     });
 
     return leaveRequest.save();
@@ -181,6 +183,7 @@ export class LeaveRequestsService {
     guid: string,
     userId: string,
     updateLeaveRequestDto: UpdateLeaveRequestDto,
+    attachmentId?: string,
   ): Promise<LeaveRequest> {
     const leaveRequest = await this.findOne(guid);
 
@@ -234,13 +237,19 @@ export class LeaveRequestsService {
       }
     }
 
+    // Create update object with optional attachment ID
+    const updateData = {
+      ...updateLeaveRequestDto,
+    };
+
+    // Add attachment ID if provided
+    if (attachmentId) {
+      updateData['attachmentId'] = attachmentId;
+    }
+
     // Update and return the leave request
     const updatedLeaveRequest = await this.leaveRequestModel
-      .findOneAndUpdate(
-        { guid },
-        { $set: updateLeaveRequestDto },
-        { new: true },
-      )
+      .findOneAndUpdate({ guid }, { $set: updateData }, { new: true })
       .exec();
 
     if (!updatedLeaveRequest) {

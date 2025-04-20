@@ -10,7 +10,11 @@ import {
   Request,
   Query,
   ForbiddenException,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { LeaveRequestsService } from './leave-requests.service';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { UpdateLeaveRequestDto } from './dto/update-leave-request.dto';
@@ -20,8 +24,9 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/schemas/user.schema';
-import { DepartmentHeadGuard } from '../common/guards/department-head.guard';
 import { DepartmentsService } from '../departments/departments.service';
+import { FilesService } from '../files/files.service';
+import { FileCategory } from '../files/interfaces/file-category.enum';
 
 @Controller('leave-requests')
 @UseGuards(JwtAuthGuard)
@@ -29,16 +34,38 @@ export class LeaveRequestsController {
   constructor(
     private readonly leaveRequestsService: LeaveRequestsService,
     private readonly departmentsService: DepartmentsService,
+    private readonly filesService: FilesService,
   ) {}
 
   @Post()
+  @UseInterceptors(FileInterceptor('attachment'))
   async create(
     @Request() req,
     @Body() createLeaveRequestDto: CreateLeaveRequestDto,
+    @UploadedFile() file: Express.Multer.File,
   ) {
+    // Check if file is provided
+    if (!file) {
+      throw new BadRequestException('Attachment file is required');
+    }
+
+    // Upload file and get metadata
+    const fileMetadata = await this.filesService.saveFileMetadata({
+      fileName: file.filename,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      path: file.path,
+      category: FileCategory.PERMISSION,
+      userId: req.user.guid,
+      isTemporary: false,
+    });
+
+    // Create leave request with attachment reference
     return this.leaveRequestsService.create(
       req.user.guid,
       createLeaveRequestDto,
+      fileMetadata.guid,
     );
   }
 
@@ -152,28 +179,94 @@ export class LeaveRequestsController {
       }
     }
 
-    return leaveRequest;
+    // Get the attachment file info
+    try {
+      const attachment = await this.filesService.findOne(
+        leaveRequest.attachmentId,
+      );
+
+      // Add attachment URL to the response
+      return {
+        ...leaveRequest.toObject(),
+        attachment: {
+          guid: attachment.guid,
+          fileName: attachment.fileName,
+          originalName: attachment.originalName,
+          mimeType: attachment.mimeType,
+          size: attachment.size,
+        },
+      };
+    } catch (error) {
+      // If attachment not found, return leave request without attachment
+      return leaveRequest;
+    }
   }
 
   @Patch(':guid')
+  @UseInterceptors(FileInterceptor('attachment'))
   async update(
     @Request() req,
     @Param('guid') guid: string,
     @Body() updateLeaveRequestDto: UpdateLeaveRequestDto,
+    @UploadedFile() file: Express.Multer.File,
   ) {
+    const leaveRequest = await this.leaveRequestsService.findOne(guid);
+    let attachmentId = leaveRequest.attachmentId;
+
+    // If a new file is uploaded, update the attachment
+    if (file) {
+      // Upload new file
+      const fileMetadata = await this.filesService.saveFileMetadata({
+        fileName: file.filename,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        path: file.path,
+        category: FileCategory.PERMISSION,
+        userId: req.user.guid,
+        isTemporary: false,
+      });
+
+      // Update attachment ID
+      attachmentId = fileMetadata.guid;
+
+      // Delete old attachment file if it exists
+      try {
+        await this.filesService.deleteFile(
+          leaveRequest.attachmentId,
+          req.user.guid,
+        );
+      } catch (error) {
+        // Ignore error if file not found
+      }
+    }
+
     return this.leaveRequestsService.update(
       guid,
       req.user.guid,
       updateLeaveRequestDto,
+      attachmentId,
     );
   }
 
   @Delete(':guid')
   async remove(@Request() req, @Param('guid') guid: string) {
+    const leaveRequest = await this.leaveRequestsService.findOne(guid);
+
+    // Delete attachment file first
+    try {
+      await this.filesService.deleteFile(
+        leaveRequest.attachmentId,
+        req.user.guid,
+      );
+    } catch (error) {
+      // Ignore error if file not found
+    }
+
+    // Then delete the leave request
     return this.leaveRequestsService.remove(guid, req.user.guid);
   }
 
-  @Post(':guid/review')
   @Post(':guid/review')
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.ADMIN, UserRole.KAJUR) // Explicitly allowing KAJUR role
@@ -204,5 +297,36 @@ export class LeaveRequestsController {
       req.user.guid,
       reviewDto,
     );
+  }
+
+  @Get(':guid/attachment')
+  async getAttachment(@Request() req, @Param('guid') guid: string) {
+    const leaveRequest = await this.leaveRequestsService.findOne(guid);
+
+    // Check permissions (similar to findOne)
+    if (
+      req.user.role !== UserRole.ADMIN &&
+      leaveRequest.userId !== req.user.guid
+    ) {
+      // For department heads, check if they lead the department
+      if (req.user.role === UserRole.KAJUR) {
+        const departments = await this.departmentsService.getDepartmentByHead(
+          req.user.guid,
+        );
+        if (
+          !departments.some((dept) => dept.guid === leaveRequest.departmentId)
+        ) {
+          throw new ForbiddenException(
+            'You do not have permission to view this attachment',
+          );
+        }
+      } else {
+        throw new ForbiddenException(
+          'You do not have permission to view this attachment',
+        );
+      }
+    }
+
+    return this.filesService.findOne(leaveRequest.attachmentId);
   }
 }

@@ -9,6 +9,7 @@ import {
 import { DepartmentsModule } from '../departments/departments.module';
 import { UsersModule } from '../users/users.module';
 import { CommonModule } from '../common/common.module';
+import { FilesModule } from '../files/files.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CommonModule } from '../common/common.module';
     DepartmentsModule,
     UsersModule,
     CommonModule,
+    FilesModule, // Add the FilesModule
   ],
   controllers: [LeaveRequestsController],
   providers: [LeaveRequestsService],

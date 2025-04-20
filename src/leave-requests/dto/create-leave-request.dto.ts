@@ -30,8 +30,4 @@ export class CreateLeaveRequestDto {
   @IsNotEmpty()
   @MinLength(5)
   reason: string;
-
-  @IsString()
-  @IsOptional()
-  attachmentUrl?: string;
 }

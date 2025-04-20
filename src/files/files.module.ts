@@ -7,6 +7,8 @@ import { FilesService } from './files.service';
 import { File, FileSchema } from './schemas/file.schema';
 import { ConfigModule } from '../config/config.module';
 import { existsSync, mkdirSync } from 'fs';
+import { FileCleanupService } from './cleanup.service';
+import { ScheduleModule } from '@nestjs/schedule';
 
 // Create upload directories if they don't exist
 const uploadDirectories = [
@@ -30,9 +32,10 @@ uploadDirectories.forEach((dir) => {
       dest: './uploads',
     }),
     ConfigModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [FilesController],
-  providers: [FilesService],
+  providers: [FilesService, FileCleanupService],
   exports: [FilesService],
 })
 export class FilesModule {}

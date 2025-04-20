@@ -38,8 +38,8 @@ export class LeaveRequest extends Document {
   @Prop({ required: true, type: String })
   reason: string;
 
-  @Prop({ type: String })
-  attachmentUrl: string;
+  @Prop({ type: String, required: true })
+  attachmentId: string;
 
   @Prop({
     required: true,
