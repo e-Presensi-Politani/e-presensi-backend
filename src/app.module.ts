@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { LeaveRequestsModule } from './leave-requests/leave-requests.module';
+import { StatisticsModule } from './statistics/statistics.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { LeaveRequestsModule } from './leave-requests/leave-requests.module';
     DepartmentsModule,
     AttendanceModule,
     LeaveRequestsModule,
+    StatisticsModule
   ],
   controllers: [AppController],
   providers: [AppService],
