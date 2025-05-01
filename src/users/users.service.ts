@@ -120,13 +120,47 @@ export class UsersService {
     }
   }
 
-  async validateUser(email: string, password: string): Promise<User | null> {
+  async validateUser(email: string, password: string): Promise<any> {
     const user = await this.userModel.findOne({ email }).exec();
-
-    if (user && (await bcrypt.compare(password, user.password))) {
-      return user;
+    if (!user) {
+      return null;
     }
 
-    return null;
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return null;
+    }
+
+    return user;
+  }
+
+  async validateUserPassword(
+    email: string,
+    password: string,
+  ): Promise<boolean> {
+    const user = await this.userModel.findOne({ email }).exec();
+    if (!user) {
+      return false;
+    }
+
+    return bcrypt.compare(password, user.password);
+  }
+
+  async updatePassword(userId: string, newPassword: string): Promise<User> {
+    const user = await this.userModel.findOne({ guid: userId }).exec();
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Hash the new password
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update user's password
+    user.password = hashedPassword;
+
+    // Save the user with the new password
+    return user.save();
   }
 }
