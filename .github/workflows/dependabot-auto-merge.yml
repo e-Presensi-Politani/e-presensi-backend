@@ -7,6 +7,10 @@ on:
       - opened
       - synchronize
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   test:
     if: github.actor == 'dependabot[bot]'
