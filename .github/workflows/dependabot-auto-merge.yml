@@ -8,7 +8,7 @@ on:
       - synchronize
 
 jobs:
-  test-and-merge:
+  test:
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
 
@@ -27,8 +27,15 @@ jobs:
       - name: Run universal test
         run: npm run test:universal
 
-      - name: Enable auto-merge
-        run: gh pr merge "$PR_URL" --auto --merge
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+  auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Merge Dependabot PR
+        uses: fastify/github-action-merge-dependabot@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          target: minor
+          merge-method: merge
