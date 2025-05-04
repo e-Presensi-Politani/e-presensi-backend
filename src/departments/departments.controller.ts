@@ -106,7 +106,7 @@ export class DepartmentsController {
   }
 
   @Get('by-member/:userId')
-  @Roles(UserRole.ADMIN, UserRole.KAJUR)
+  @Roles(UserRole.ADMIN, UserRole.KAJUR, UserRole.DOSEN)
   getDepartmentsByMember(@Param('userId') userId: string) {
     return this.departmentsService.getDepartmentsByMember(userId);
   }
