@@ -4,6 +4,6 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
-      time: "05:51"
+      time: "11:02"
     commit-message:
       prefix: "⬆"
