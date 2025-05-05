@@ -1,0 +1,56 @@
+name: Dependabot Auto Merge (Manual Test)
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  test:
+    if: github.actor == 'dependabot[bot]' || github.actor == 'm-ghozi'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run universal test
+        run: npm run test:universal
+
+  auto-merge:
+    if: github.actor == 'dependabot[bot]' || github.actor == 'm-ghozi'
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Merge PR (Manual Test)
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            console.log("PR user login:", pr.user.login);
+
+            if (['dependabot[bot]', 'm-ghozi'].includes(pr.user.login)) {
+              console.log("Merging PR...");
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                merge_method: 'merge',
+              });
+            } else {
+              console.log("Not an allowed PR user. Skipping merge.");
+            }
