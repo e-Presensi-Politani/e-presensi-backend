@@ -30,7 +30,7 @@ jobs:
         run: npm run test:universal
 
   auto-merge:
-    if: github.event.pull_request != null
+    if: github.actor == 'dependabot[bot]'
     needs: test
     runs-on: ubuntu-latest
 
