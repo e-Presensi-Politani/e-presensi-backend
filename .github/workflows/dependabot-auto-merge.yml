@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   test:
-    if: github.actor == 'dependabot[bot]'
+    if: github.actor != ''
     runs-on: ubuntu-latest
 
     steps:
@@ -33,7 +33,7 @@ jobs:
         run: npm run test:universal
 
   auto-merge:
-    if: github.actor == 'dependabot[bot]'
+    if: github.actor != ''
     needs: test
     runs-on: ubuntu-latest
 
