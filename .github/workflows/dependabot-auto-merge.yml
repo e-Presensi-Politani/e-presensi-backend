@@ -6,11 +6,12 @@ on:
     types:
       - opened
       - synchronize
-      
+      - reopened
+
 permissions:
   contents: write
   pull-requests: write
-  
+
 jobs:
   test:
     if: github.actor == 'dependabot[bot]'
@@ -37,9 +38,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Merge Dependabot PR
-        uses: fastify/github-action-merge-dependabot@v3
+      - name: Merge Dependabot PR if checks pass
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          target: minor
-          merge-method: merge
+          script: |
+            const pr = context.payload.pull_request;
+            if (pr.user.login === 'dependabot[bot]') {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                merge_method: 'merge',
+              });
+            }
