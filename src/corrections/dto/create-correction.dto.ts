@@ -33,7 +33,10 @@ export class CreateCorrectionDto {
   @IsDateString()
   proposedTime?: string;
 
-  @IsOptional()
+  @IsNotEmpty({
+    message:
+      'Attendance ID is required for all corrections except missed check-in',
+  })
   @IsString()
   attendanceId?: string;
 }

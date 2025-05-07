@@ -7,11 +7,16 @@ import { Correction, CorrectionSchema } from './schemas/correction.schema';
 import { UsersModule } from '../users/users.module';
 import { DepartmentsModule } from '../departments/departments.module';
 import { AttendanceModule } from '../attendance/attendance.module';
+import {
+  Attendance,
+  AttendanceSchema,
+} from '../attendance/schemas/attendance.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Correction.name, schema: CorrectionSchema },
+      { name: Attendance.name, schema: AttendanceSchema },
     ]),
     UsersModule,
     DepartmentsModule,
