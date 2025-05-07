@@ -79,6 +79,15 @@ export class Attendance {
 
   @Prop()
   updatedAt: Date;
+
+  @Prop({ type: Boolean, default: false })
+  isManualCheckIn: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  isManualCheckOut: boolean;
+
+  @Prop({ type: String })
+  correctionId: string; // Reference to the correction that modified this attendance
 }
 
 export const AttendanceSchema = SchemaFactory.createForClass(Attendance);

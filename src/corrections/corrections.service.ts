@@ -20,12 +20,19 @@ import { UsersService } from '../users/users.service';
 import { DepartmentsService } from '../departments/departments.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import * as moment from 'moment';
+import { WorkingStatus } from 'src/common/interfaces/working-status.enum';
+import {
+  Attendance,
+  AttendanceDocument,
+} from '../attendance/schemas/attendance.schema';
 
 @Injectable()
 export class CorrectionsService {
   constructor(
     @InjectModel(Correction.name)
     private correctionModel: Model<CorrectionDocument>,
+    @InjectModel(Attendance.name)
+    private attendanceModel: Model<AttendanceDocument>,
     private usersService: UsersService,
     private departmentsService: DepartmentsService,
     private attendanceService: AttendanceService,
@@ -96,6 +103,46 @@ export class CorrectionsService {
       throw new BadRequestException(
         'Proposed time is required for missed check-in/out corrections',
       );
+    }
+
+    // Validate attendance record exists and belongs to the user (except for MISSED_CHECK_IN)
+    if (createCorrectionDto.type !== CorrectionType.MISSED_CHECK_IN) {
+      if (!createCorrectionDto.attendanceId) {
+        throw new BadRequestException(
+          'Attendance ID is required for this correction type',
+        );
+      }
+
+      try {
+        const attendance = await this.attendanceService.findOne(
+          createCorrectionDto.attendanceId,
+        );
+
+        // Verify the attendance belongs to the requesting user
+        if (attendance.userId !== userId) {
+          throw new ForbiddenException(
+            'You can only correct your own attendance records',
+          );
+        }
+
+        // Validate correction date matches attendance date
+        const attendanceDate = new Date(attendance.date);
+        attendanceDate.setHours(0, 0, 0, 0);
+        correctionDate.setHours(0, 0, 0, 0);
+
+        if (attendanceDate.getTime() !== correctionDate.getTime()) {
+          throw new BadRequestException(
+            'Correction date must match the attendance record date',
+          );
+        }
+      } catch (error) {
+        if (error instanceof NotFoundException) {
+          throw new BadRequestException(
+            'The specified attendance record does not exist',
+          );
+        }
+        throw error;
+      }
     }
 
     // Create correction request
@@ -246,112 +293,145 @@ export class CorrectionsService {
    * @param correction Approved correction
    */
   private async applyCorrection(correction: Correction): Promise<void> {
-    // Find the attendance record for the day of the correction
-    const correctionDate = new Date(correction.date);
-    correctionDate.setHours(0, 0, 0, 0);
-    const nextDay = new Date(correctionDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-
     let attendance;
 
     try {
-      // If attendanceId is provided, use it
-      if (correction.attendanceId) {
-        attendance = await this.attendanceService.findOne(
-          correction.attendanceId,
-        );
-      } else {
-        // Otherwise find by date and userId
+      // For MISSED_CHECK_IN, we might not have an attendanceId yet
+      if (
+        correction.type === CorrectionType.MISSED_CHECK_IN &&
+        !correction.attendanceId
+      ) {
+        // Find existing attendance for that date if any
+        const correctionDate = new Date(correction.date);
+        correctionDate.setHours(0, 0, 0, 0);
+
         const attendances = await this.attendanceService.findAll({
           userId: correction.userId,
           startDate: correctionDate.toISOString(),
           endDate: correctionDate.toISOString(),
         });
-        attendance = attendances.length > 0 ? attendances[0] : null;
+
+        if (attendances.length > 0) {
+          // Use existing attendance if found
+          attendance = attendances[0];
+        } else {
+          // No attendance record found for MISSED_CHECK_IN
+          // A new attendance record should be created using custom method in AttendanceService
+          // This would be implemented in AttendanceService
+          await this.createMissedCheckIn(correction);
+          return;
+        }
+      } else {
+        // For all other correction types, attendanceId is required
+        if (!correction.attendanceId) {
+          throw new BadRequestException(
+            'No attendance ID specified for correction',
+          );
+        }
+
+        attendance = await this.attendanceService.findOne(
+          correction.attendanceId,
+        );
+
+        // Verify the attendance belongs to the user requesting the correction
+        if (attendance.userId !== correction.userId) {
+          throw new ForbiddenException(
+            "Cannot apply correction to another user's attendance",
+          );
+        }
       }
     } catch (error) {
-      // If no attendance is found, it's okay for some correction types
-      if (
-        correction.type !== CorrectionType.MISSED_CHECK_IN &&
-        correction.type !== CorrectionType.MISSED_CHECK_OUT
-      ) {
+      if (error instanceof NotFoundException) {
         throw new BadRequestException(
-          'No attendance record found for this date',
+          `Attendance record ${correction.attendanceId} not found`,
         );
       }
+      throw error;
     }
 
     // Apply correction based on type
     switch (correction.type) {
       case CorrectionType.BREAK_TIME_AS_WORK:
-        // Typically this would increase work hours or adjust status
-        if (attendance) {
-          // Implementation depends on specific business logic
-          // This is a placeholder for the actual implementation
-          // Example: increase work hours by 1 (for lunch break)
-          // attendance.workHours += 1;
-          // await attendance.save();
+        // Add 1 hour to work hours (typical lunch break)
+        if (!attendance.workHours) {
+          attendance.workHours = 0;
         }
+        attendance.workHours += 1;
+        await this.attendanceModel.updateOne(
+          { guid: attendance.guid },
+          { workHours: attendance.workHours },
+        );
         break;
 
       case CorrectionType.EARLY_DEPARTURE:
-        // Mark early departure as approved
-        if (attendance) {
-          // Implementation depends on specific business logic
-          // Example: update status to PRESENT if it was EARLY_DEPARTURE
-          // if (attendance.status === 'EARLY_DEPARTURE') {
-          //   attendance.status = 'PRESENT';
-          //   await attendance.save();
-          // }
+        // Mark early departure as approved/present
+        if (attendance.status === WorkingStatus.EARLY_DEPARTURE) {
+          await this.attendanceModel.updateOne(
+            { guid: attendance.guid },
+            { status: WorkingStatus.PRESENT },
+          );
         }
         break;
 
       case CorrectionType.LATE_ARRIVAL:
-        // Mark late arrival as approved
-        if (attendance) {
-          // Implementation depends on specific business logic
-          // Example: update status to PRESENT if it was LATE
-          // if (attendance.status === 'LATE') {
-          //   attendance.status = 'PRESENT';
-          //   await attendance.save();
-          // }
+        // Mark late arrival as approved/present
+        if (attendance.status === WorkingStatus.LATE) {
+          await this.attendanceModel.updateOne(
+            { guid: attendance.guid },
+            { status: WorkingStatus.PRESENT },
+          );
         }
         break;
 
       case CorrectionType.MISSED_CHECK_IN:
-        // Create or update attendance with a manual check-in
-        // Implementation depends on how attendance service handles this
-        // This is a placeholder for the actual implementation
-        // Example:
-        // if (!attendance) {
-        //   // Create new attendance with manual check-in
-        //   await this.attendanceService.createManualAttendance({
-        //     userId: correction.userId,
-        //     date: correctionDate,
-        //     checkInTime: correction.proposedTime,
-        //     isManualCheckIn: true,
-        //   });
-        // } else {
-        //   // Update existing attendance with manual check-in
-        //   attendance.checkInTime = correction.proposedTime;
-        //   attendance.isManualCheckIn = true;
-        //   await attendance.save();
-        // }
+        if (attendance) {
+          // Update existing attendance with manual check-in time
+          await this.attendanceModel.updateOne(
+            { guid: attendance.guid },
+            {
+              checkInTime: correction.proposedTime,
+              isManualCheckIn: true,
+            },
+          );
+
+          // If both check-in and check-out times exist, recalculate work hours
+          if (attendance.checkOutTime) {
+            const workHours =
+              (attendance.checkOutTime.getTime() -
+                correction.proposedTime.getTime()) /
+              (1000 * 60 * 60);
+            await this.attendanceModel.updateOne(
+              { guid: attendance.guid },
+              { workHours: parseFloat(workHours.toFixed(2)) },
+            );
+          }
+        }
         break;
 
       case CorrectionType.MISSED_CHECK_OUT:
-        // Update attendance with a manual check-out
-        // Implementation depends on how attendance service handles this
-        // This is a placeholder for the actual implementation
-        // Example:
-        // if (attendance) {
-        //   attendance.checkOutTime = correction.proposedTime;
-        //   attendance.isManualCheckOut = true;
-        //   attendance.workHours = (
-        //     correction.proposedTime.getTime() - attendance.checkInTime.getTime()
-        //   ) / (1000 * 60 * 60);
-        //   await attendance.save();
-        // }
+        if (attendance) {
+          if (!attendance.checkInTime) {
+            throw new BadRequestException(
+              'Cannot add check-out time when check-in time is missing',
+            );
+          }
+
+          // Calculate work hours
+          const workHours =
+            (correction.proposedTime.getTime() -
+              attendance.checkInTime.getTime()) /
+            (1000 * 60 * 60);
+
+          // Update attendance with manual check-out
+          await this.attendanceModel.updateOne(
+            { guid: attendance.guid },
+            {
+              checkOutTime: correction.proposedTime,
+              isManualCheckOut: true,
+              workHours: parseFloat(workHours.toFixed(2)),
+            },
+          );
+        }
         break;
 
       default:
@@ -384,5 +464,43 @@ export class CorrectionsService {
       used: monthlyCorrections,
       limit: 2, // Hard-coded limit of 2 corrections per month
     };
+  }
+
+  /**
+   * Create a new attendance record for missed check-in
+   * @param correction The approved correction for missed check-in
+   */
+  private async createMissedCheckIn(correction: Correction): Promise<void> {
+    const user = await this.usersService.findOne(correction.userId);
+
+    // Get user's department
+    const departments = await this.departmentsService.getDepartmentsByMember(
+      correction.userId,
+    );
+    let departmentId: string | null = null;
+    if (departments.length > 0) {
+      departmentId = departments[0].guid;
+    }
+
+    // Create a new attendance record with manual check-in
+    const correctionDate = new Date(correction.date);
+    correctionDate.setHours(0, 0, 0, 0);
+
+    const newAttendance = new this.attendanceModel({
+      userId: correction.userId,
+      date: correctionDate,
+      checkInTime: correction.proposedTime,
+      isManualCheckIn: true,
+      status: WorkingStatus.PRESENT,
+      departmentId,
+    });
+
+    const savedAttendance = await newAttendance.save();
+
+    // Update the correction with the new attendance ID
+    await this.correctionModel.updateOne(
+      { guid: correction.guid },
+      { attendanceId: savedAttendance.guid },
+    );
   }
 }

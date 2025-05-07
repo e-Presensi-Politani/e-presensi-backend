@@ -413,4 +413,119 @@ export class AttendanceService {
 
     return summary;
   }
+
+  /**
+   * Create a manual attendance record (for corrections)
+   * @param manualAttendanceData The data for the manual attendance
+   */
+  async createManualAttendance(manualAttendanceData: {
+    userId: string;
+    date: Date;
+    checkInTime?: Date;
+    checkOutTime?: Date;
+    correctionId: string;
+    departmentId?: string;
+  }): Promise<Attendance> {
+    const {
+      userId,
+      date,
+      checkInTime,
+      checkOutTime,
+      correctionId,
+      departmentId,
+    } = manualAttendanceData;
+
+    // Get user's departments if not provided
+    let deptId = departmentId;
+    if (!deptId) {
+      const departments =
+        await this.departmentsService.getDepartmentsByMember(userId);
+      if (departments.length > 0) {
+        deptId = departments[0].guid;
+      }
+    }
+
+    // Set appropriate status
+    let status = WorkingStatus.PRESENT;
+
+    // Calculate work hours if both check-in and check-out are provided
+    let workHours;
+    if (checkInTime && checkOutTime) {
+      workHours =
+        (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+      workHours = parseFloat(workHours.toFixed(2));
+    }
+
+    const attendance = new this.attendanceModel({
+      userId,
+      date,
+      checkInTime,
+      checkOutTime,
+      isManualCheckIn: !!checkInTime,
+      isManualCheckOut: !!checkOutTime,
+      workHours,
+      status,
+      departmentId: deptId,
+      correctionId,
+    });
+
+    return attendance.save();
+  }
+
+  /**
+   * Update attendance record with manual check-in or check-out
+   * @param attendanceId The ID of the attendance record to update
+   * @param updateData The data to update
+   * @param correctionId The ID of the correction that triggered this update
+   */
+  async updateAttendanceForCorrection(
+    attendanceId: string,
+    updateData: {
+      checkInTime?: Date;
+      checkOutTime?: Date;
+      status?: string;
+      workHours?: number;
+    },
+    correctionId: string,
+  ): Promise<Attendance> {
+    const attendance = await this.attendanceModel.findOne({
+      guid: attendanceId,
+    });
+
+    if (!attendance) {
+      throw new NotFoundException(
+        `Attendance record with ID ${attendanceId} not found`,
+      );
+    }
+
+    // Update fields if provided
+    if (updateData.checkInTime) {
+      attendance.checkInTime = updateData.checkInTime;
+      attendance.isManualCheckIn = true;
+    }
+
+    if (updateData.checkOutTime) {
+      attendance.checkOutTime = updateData.checkOutTime;
+      attendance.isManualCheckOut = true;
+    }
+
+    if (updateData.status) {
+      attendance.status = updateData.status;
+    }
+
+    if (updateData.workHours !== undefined) {
+      attendance.workHours = updateData.workHours;
+    } else if (attendance.checkInTime && attendance.checkOutTime) {
+      // Recalculate work hours if both check-in and check-out times exist
+      attendance.workHours =
+        (attendance.checkOutTime.getTime() - attendance.checkInTime.getTime()) /
+        (1000 * 60 * 60);
+      attendance.workHours = parseFloat(attendance.workHours.toFixed(2));
+    }
+
+    // Link to the correction
+    attendance.correctionId = correctionId;
+
+    return attendance.save();
+  }
 }
