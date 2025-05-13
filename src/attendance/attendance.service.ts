@@ -85,8 +85,8 @@ export class AttendanceService {
     // Assuming work starts at 8:00 AM
     const lateToleranceMinutes = this.configService.lateToleranceMinutes;
     const isLate =
-      currentHour > 8 ||
-      (currentHour === 8 && currentMinutes > lateToleranceMinutes);
+      currentHour > 10 ||
+      (currentHour === 10 && currentMinutes > lateToleranceMinutes);
 
     let status = WorkingStatus.PRESENT;
     if (!isWithinGeofence) {
