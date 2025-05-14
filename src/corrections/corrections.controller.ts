@@ -79,6 +79,46 @@ export class CorrectionsController {
     return this.correctionsService.getMonthlyUsage(req.user.guid);
   }
 
+  @Get('pending')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.KAJUR)
+  async findPending(
+    @Request() req,
+    @Query('departmentId') departmentId: string,
+  ) {
+    if (req.user.role === UserRole.ADMIN) {
+      if (!departmentId) {
+        throw new ForbiddenException('Department ID is required for admin');
+      }
+      return this.correctionsService.findPendingByDepartment(departmentId);
+    }
+
+    // For department heads, verify they lead the requested department
+    if (departmentId) {
+      const departments = await this.departmentsService.getDepartmentByHead(
+        req.user.guid,
+      );
+      if (!departments.some((dept) => dept.guid === departmentId)) {
+        throw new ForbiddenException(
+          'You can only view corrections for departments you lead',
+        );
+      }
+      return this.correctionsService.findPendingByDepartment(departmentId);
+    } else {
+      // Get the first department they lead
+      const departments = await this.departmentsService.getDepartmentByHead(
+        req.user.guid,
+      );
+      if (departments.length === 0) {
+        return [];
+      }
+      return this.correctionsService.findPendingByDepartment(
+        departments[0].guid,
+      );
+    }
+  }
+
+  // Keep the legacy endpoint for backward compatibility
   @Get('department/:departmentId/pending')
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.ADMIN, UserRole.KAJUR)
