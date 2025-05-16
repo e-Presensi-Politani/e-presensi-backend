@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -17,10 +18,15 @@ import { UsersService } from '../users/users.service';
 import { DepartmentsService } from '../departments/departments.service';
 import { FilesService } from '../files/files.service';
 import { WorkingStatus } from '../common/interfaces/working-status.enum';
+import { LeaveRequestsService } from '../leave-requests/leave-requests.service';
+import { LeaveRequestType } from '../leave-requests/schemas/leave-request.schema';
 import * as moment from 'moment';
+import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+
   constructor(
     @InjectModel(Attendance.name)
     private attendanceModel: Model<AttendanceDocument>,
@@ -29,6 +35,7 @@ export class AttendanceService {
     private usersService: UsersService,
     private departmentsService: DepartmentsService,
     private filesService: FilesService,
+    private leaveRequestsService: LeaveRequestsService,
   ) {}
 
   /**
@@ -46,6 +53,17 @@ export class AttendanceService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Check if user is on leave today
+    const leaveStatus = await this.leaveRequestsService.checkUserLeaveStatus(
+      userId,
+      today,
+    );
+    if (leaveStatus.isOnLeave) {
+      throw new BadRequestException(
+        `You are on ${leaveStatus.leaveType} today and cannot check in`,
+      );
+    }
+
     // Check if user already checked in today
     const existingAttendance = await this.attendanceModel.findOne({
       userId,
@@ -62,7 +80,7 @@ export class AttendanceService {
     // Get user's departments
     const departments =
       await this.departmentsService.getDepartmentsByMember(userId);
-    let departmentId: string | null = null;
+    let departmentId: string = '';
     if (departments.length > 0) {
       departmentId = departments[0].guid;
     }
@@ -197,7 +215,20 @@ export class AttendanceService {
 
     let status = attendance.status;
     if (isEarlyDeparture && status === WorkingStatus.PRESENT) {
-      status = WorkingStatus.EARLY_DEPARTURE;
+      // Check if user has an approved early departure
+      const leaveStatus = await this.leaveRequestsService.checkUserLeaveStatus(
+        userId,
+        today,
+      );
+      if (
+        leaveStatus.isOnLeave &&
+        (leaveStatus.leaveType === LeaveRequestType.WFH ||
+          leaveStatus.leaveType === LeaveRequestType.WFA)
+      ) {
+        status = WorkingStatus.REMOTE_WORKING;
+      } else {
+        status = WorkingStatus.EARLY_DEPARTURE;
+      }
     }
 
     // Update attendance record
@@ -435,6 +466,39 @@ export class AttendanceService {
       departmentId,
     } = manualAttendanceData;
 
+    // Check if there's an existing attendance record for this user on this date
+    const existingAttendance = await this.attendanceModel.findOne({
+      userId,
+      date: {
+        $gte: new Date(date.setHours(0, 0, 0, 0)),
+        $lt: new Date(new Date(date).setHours(23, 59, 59, 999)),
+      },
+    });
+
+    if (existingAttendance) {
+      // Update existing record instead of creating a new one
+      this.logger.log(
+        `Updating existing attendance record for manual correction: ${existingAttendance.guid}`,
+      );
+      return this.updateAttendanceForCorrection(
+        existingAttendance.guid,
+        {
+          checkInTime,
+          checkOutTime,
+          workHours:
+            checkInTime && checkOutTime
+              ? parseFloat(
+                  (
+                    (checkOutTime.getTime() - checkInTime.getTime()) /
+                    (1000 * 60 * 60)
+                  ).toFixed(2),
+                )
+              : undefined,
+        },
+        correctionId,
+      );
+    }
+
     // Get user's departments if not provided
     let deptId = departmentId;
     if (!deptId) {
@@ -445,8 +509,28 @@ export class AttendanceService {
       }
     }
 
-    // Set appropriate status
+    // Check if the date coincides with an approved leave request
+    const leaveStatus = await this.leaveRequestsService.checkUserLeaveStatus(
+      userId,
+      date,
+    );
+
+    // Set appropriate status based on leave status
     let status = WorkingStatus.PRESENT;
+    if (leaveStatus.isOnLeave) {
+      switch (leaveStatus.leaveType) {
+        case LeaveRequestType.LEAVE:
+          status = WorkingStatus.ON_LEAVE;
+          break;
+        case LeaveRequestType.WFH:
+        case LeaveRequestType.WFA:
+          status = WorkingStatus.REMOTE_WORKING;
+          break;
+        case LeaveRequestType.DL:
+          status = WorkingStatus.OFFICIAL_TRAVEL;
+          break;
+      }
+    }
 
     // Calculate work hours if both check-in and check-out are provided
     let workHours;
@@ -511,6 +595,28 @@ export class AttendanceService {
 
     if (updateData.status) {
       attendance.status = updateData.status;
+    } else {
+      // If status not provided, check for leave status on this date
+      const leaveStatus = await this.leaveRequestsService.checkUserLeaveStatus(
+        attendance.userId,
+        attendance.date,
+      );
+
+      if (leaveStatus.isOnLeave) {
+        // Map leave type to appropriate status
+        switch (leaveStatus.leaveType) {
+          case LeaveRequestType.LEAVE:
+            attendance.status = WorkingStatus.ON_LEAVE;
+            break;
+          case LeaveRequestType.WFH:
+          case LeaveRequestType.WFA:
+            attendance.status = WorkingStatus.REMOTE_WORKING;
+            break;
+          case LeaveRequestType.DL:
+            attendance.status = WorkingStatus.OFFICIAL_TRAVEL;
+            break;
+        }
+      }
     }
 
     if (updateData.workHours !== undefined) {
@@ -527,5 +633,189 @@ export class AttendanceService {
     attendance.correctionId = correctionId;
 
     return attendance.save();
+  }
+
+  /**
+   * Mark absences for users who did not check in
+   * To be run at the end of the day
+   */
+  @Cron('0 23 * * *') // Run at 11:00 PM every day
+  async markAbsencesForToday(): Promise<void> {
+    try {
+      this.logger.log('Starting daily absence marking process');
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Get all active users
+      const activeUsers = await this.usersService.findAll();
+
+      for (const user of activeUsers) {
+        // Check if user already has an attendance record for today
+        const existingAttendance = await this.findTodayAttendance(user.guid);
+
+        if (!existingAttendance) {
+          // Check if user is on leave
+          const leaveStatus =
+            await this.leaveRequestsService.checkUserLeaveStatus(
+              user.guid,
+              today,
+            );
+
+          if (leaveStatus.isOnLeave) {
+            // User is on leave - create appropriate attendance record
+            let status: WorkingStatus;
+
+            switch (leaveStatus.leaveType) {
+              case LeaveRequestType.LEAVE:
+                status = WorkingStatus.ON_LEAVE;
+                break;
+              case LeaveRequestType.WFH:
+              case LeaveRequestType.WFA:
+                status = WorkingStatus.REMOTE_WORKING;
+                break;
+              case LeaveRequestType.DL:
+                status = WorkingStatus.OFFICIAL_TRAVEL;
+                break;
+              default:
+                status = WorkingStatus.ON_LEAVE;
+            }
+
+            // Get user's department
+            const departments =
+              await this.departmentsService.getDepartmentsByMember(user.guid);
+            let departmentId: string | undefined = undefined;
+            if (departments.length > 0) {
+              departmentId = departments[0].guid;
+            }
+
+            // Create attendance record with appropriate status
+            const attendance = new this.attendanceModel({
+              userId: user.guid,
+              date: today,
+              status,
+              departmentId,
+              isManualCheckIn: true,
+              isManualCheckOut: true,
+              checkInTime: new Date(new Date(today).setHours(8, 0, 0, 0)),
+              checkOutTime: new Date(new Date(today).setHours(17, 0, 0, 0)),
+              workHours: 8, // Standard work day
+              checkInNotes: `Auto-generated for ${leaveStatus.leaveType}`,
+              checkOutNotes: `Auto-generated for ${leaveStatus.leaveType}`,
+            });
+
+            await attendance.save();
+            this.logger.log(
+              `Created ${status} record for user ${user.guid} on leave`,
+            );
+          } else {
+            // User is absent without leave - mark as absent
+            const departments =
+              await this.departmentsService.getDepartmentsByMember(user.guid);
+            let departmentId: string | undefined = undefined;
+            if (departments.length > 0) {
+              departmentId = departments[0].guid;
+            }
+
+            const attendance = new this.attendanceModel({
+              userId: user.guid,
+              date: today,
+              status: WorkingStatus.ABSENT,
+              departmentId,
+              checkInNotes: 'Automatically marked as absent',
+            });
+
+            await attendance.save();
+            this.logger.log(`Marked user ${user.guid} as absent`);
+          }
+        }
+      }
+
+      this.logger.log('Completed daily absence marking process');
+    } catch (error) {
+      this.logger.error(
+        `Error in markAbsencesForToday: ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+
+  /**
+   * Synchronize attendance records with leave requests
+   * This helps ensure records are consistent with approved leaves
+   */
+  async synchronizeWithLeaveRequests(
+    startDate: Date,
+    endDate: Date,
+    userId?: string,
+  ): Promise<void> {
+    try {
+      this.logger.log(
+        'Starting attendance synchronization with leave requests',
+      );
+
+      const query: any = {
+        date: {
+          $gte: startDate,
+          $lte: endDate,
+        },
+      };
+
+      if (userId) {
+        query.userId = userId;
+      }
+
+      // Get all attendance records in the date range
+      const attendanceRecords = await this.attendanceModel.find(query).exec();
+
+      // Process each attendance record
+      for (const attendance of attendanceRecords) {
+        // Check if there's a leave request for this date
+        const leaveStatus =
+          await this.leaveRequestsService.checkUserLeaveStatus(
+            attendance.userId,
+            attendance.date,
+          );
+
+        if (leaveStatus.isOnLeave) {
+          // Map leave type to appropriate status
+          let status: WorkingStatus;
+          switch (leaveStatus.leaveType) {
+            case LeaveRequestType.LEAVE:
+              status = WorkingStatus.ON_LEAVE;
+              break;
+            case LeaveRequestType.WFH:
+            case LeaveRequestType.WFA:
+              status = WorkingStatus.REMOTE_WORKING;
+              break;
+            case LeaveRequestType.DL:
+              status = WorkingStatus.OFFICIAL_TRAVEL;
+              break;
+            default:
+              status = WorkingStatus.ON_LEAVE;
+          }
+
+          // Update attendance status if it's different
+          if (attendance.status !== status) {
+            attendance.status = status;
+            attendance.checkInNotes = `${attendance.checkInNotes || ''} [Updated based on approved ${leaveStatus.leaveType}]`;
+
+            await attendance.save();
+            this.logger.log(
+              `Updated attendance ${attendance.guid} status to ${status} based on leave request`,
+            );
+          }
+        }
+      }
+
+      this.logger.log(
+        'Completed attendance synchronization with leave requests',
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error in synchronizeWithLeaveRequests: ${error.message}`,
+        error.stack,
+      );
+    }
   }
 }

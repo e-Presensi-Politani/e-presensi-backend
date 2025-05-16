@@ -7,4 +7,6 @@ export enum WorkingStatus {
   ON_LEAVE = 'on_leave',
   OFFICIAL_TRAVEL = 'official_travel',
   REMOTE_WORKING = 'remote_working',
+  WORK_FROM_HOME = 'work_from_home',
+  WORK_FROM_ANYWHERE = 'work_from_anywhere',
 }
