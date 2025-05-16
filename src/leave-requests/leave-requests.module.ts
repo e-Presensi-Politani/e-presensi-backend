@@ -12,11 +12,14 @@ import { DepartmentsModule } from '../departments/departments.module';
 import { UsersModule } from '../users/users.module';
 import { CommonModule } from '../common/common.module';
 import { FilesModule } from '../files/files.module';
+import { LeaveAttendanceSyncService } from './leave-attendance-sync.service'; 
+import { Attendance, AttendanceSchema } from 'src/attendance/schemas/attendance.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: LeaveRequest.name, schema: LeaveRequestSchema },
+      { name: Attendance.name, schema: AttendanceSchema },
     ]),
     MulterModule.register({
       dest: './uploads/permission',
@@ -27,7 +30,7 @@ import { FilesModule } from '../files/files.module';
     FilesModule,
   ],
   controllers: [LeaveRequestsController],
-  providers: [LeaveRequestsService],
-  exports: [LeaveRequestsService],
+  providers: [LeaveRequestsService, LeaveAttendanceSyncService],
+  exports: [LeaveRequestsService, LeaveAttendanceSyncService],
 })
 export class LeaveRequestsModule {}
