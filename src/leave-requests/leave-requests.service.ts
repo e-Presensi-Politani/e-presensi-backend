@@ -1,3 +1,4 @@
+// src/leave-requests/leave-requests.service.ts
 import {
   BadRequestException,
   Injectable,
@@ -16,6 +17,7 @@ import { QueryLeaveRequestsDto } from './dto/query-leave-requests.dto';
 import { ReviewLeaveRequestDto } from './dto/review-leave-request.dto';
 import { DepartmentsService } from '../departments/departments.service';
 import { UsersService } from '../users/users.service';
+import { LeaveAttendanceSyncService } from './leave-attendance-sync.service';
 
 @Injectable()
 export class LeaveRequestsService {
@@ -24,6 +26,7 @@ export class LeaveRequestsService {
     private leaveRequestModel: Model<LeaveRequest>,
     private departmentsService: DepartmentsService,
     private usersService: UsersService,
+    private leaveAttendanceSyncService: LeaveAttendanceSyncService,
   ) {}
 
   /**
@@ -330,6 +333,13 @@ export class LeaveRequestsService {
     if (!updatedLeaveRequest) {
       throw new NotFoundException(
         `Leave request with GUID "${guid}" not found`,
+      );
+    }
+
+    // If the leave request was approved, create corresponding attendance records
+    if (updatedLeaveRequest.status === LeaveRequestStatus.APPROVED) {
+      await this.leaveAttendanceSyncService.createAttendanceRecordsForLeaveRequest(
+        updatedLeaveRequest,
       );
     }
 

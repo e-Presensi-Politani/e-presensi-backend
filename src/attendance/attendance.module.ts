@@ -10,6 +10,7 @@ import { ConfigModule } from '../config/config.module';
 import { UsersModule } from '../users/users.module';
 import { DepartmentsModule } from '../departments/departments.module';
 import { FilesModule } from '../files/files.module';
+import { LeaveRequestsModule } from '../leave-requests/leave-requests.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { FilesModule } from '../files/files.module';
     UsersModule,
     DepartmentsModule,
     FilesModule,
+    LeaveRequestsModule,
   ],
   controllers: [AttendanceController],
   providers: [AttendanceService],
