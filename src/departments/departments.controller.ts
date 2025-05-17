@@ -120,7 +120,7 @@ export class DepartmentsController {
     return this.departmentsService.getDepartmentByHead(userId);
   }
 
-  @Get('department/by-name/:name')
+  @Get('by-name/:name')
   @UseGuards(JwtAuthGuard)
   async findDepartmentByName(@Param('name') name: string, @Request() req) {
     // For regular users, validate they're members of the department
