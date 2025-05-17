@@ -10,6 +10,9 @@ import {
   UseGuards,
   HttpStatus,
   HttpCode,
+  NotFoundException,
+  Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { DepartmentsService } from './departments.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
@@ -112,8 +115,55 @@ export class DepartmentsController {
   }
 
   @Get('by-head/:userId')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN,UserRole.KAJUR)
   getDepartmentByHead(@Param('userId') userId: string) {
     return this.departmentsService.getDepartmentByHead(userId);
+  }
+
+  @Get('by-name/:name')
+  @UseGuards(JwtAuthGuard)
+  async findDepartmentByName(@Param('name') name: string, @Request() req) {
+    // For regular users, validate they're members of the department
+    const department = await this.departmentsService.getDepartmentByName(name);
+
+    if (!department) {
+      throw new NotFoundException(`Department with name ${name} not found`);
+    }
+
+    // For admin, allow access to any department
+    if (req.user.role === UserRole.ADMIN) {
+      return department;
+    }
+
+    // For department heads, check if they are the head of the requested department
+    if (req.user.role === UserRole.KAJUR) {
+      const leadDepartments = await this.departmentsService.getDepartmentByHead(
+        req.user.guid,
+      );
+
+      const isHeadOfDepartment = leadDepartments.some(
+        (dept) => dept.guid === department.guid,
+      );
+
+      if (isHeadOfDepartment) {
+        return department;
+      }
+    }
+
+    // For regular users, check if they are members of the department
+    const userDepartments =
+      await this.departmentsService.getDepartmentsByMember(req.user.guid);
+
+    const isMemberOfDepartment = userDepartments.some(
+      (dept) => dept.guid === department.guid,
+    );
+
+    if (!isMemberOfDepartment) {
+      throw new ForbiddenException(
+        'You do not have permission to access this department',
+      );
+    }
+
+    return department;
   }
 }
