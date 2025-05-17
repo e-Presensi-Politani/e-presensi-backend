@@ -188,4 +188,20 @@ export class DepartmentsService {
       })
       .exec();
   }
+
+  /**
+   * Get a department by its name
+   * @param name Department name
+   * @returns Department or null if not found
+   */
+  async getDepartmentByName(name: string): Promise<Department | null> {
+    // Use case-insensitive search for better user experience
+    const department = await this.departmentModel
+      .findOne({
+        name: { $regex: new RegExp(`^${name}$`, 'i') },
+      })
+      .exec();
+
+    return department;
+  }
 }
