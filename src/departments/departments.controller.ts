@@ -115,7 +115,7 @@ export class DepartmentsController {
   }
 
   @Get('by-head/:userId')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN,UserRole.KAJUR)
   getDepartmentByHead(@Param('userId') userId: string) {
     return this.departmentsService.getDepartmentByHead(userId);
   }
