@@ -15,6 +15,7 @@ import {
 import { Response } from 'express';
 import * as fs from 'fs';
 import { StatisticsService } from './statistics.service';
+import { ReportsService } from './reports.service';
 import { StatisticsQueryDto } from './dto/statistics-query.dto';
 import { GenerateReportDto } from './dto/generate-report.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -25,7 +26,10 @@ import { UserRole } from '../users/schemas/user.schema';
 @Controller('statistics')
 @UseGuards(JwtAuthGuard)
 export class StatisticsController {
-  constructor(private readonly statisticsService: StatisticsService) {}
+  constructor(
+    private readonly statisticsService: StatisticsService,
+    private readonly reportsService: ReportsService,
+  ) {}
 
   @Get()
   @UseGuards(RolesGuard)
@@ -49,7 +53,7 @@ export class StatisticsController {
   ) {
     try {
       const { fileName, filePath } =
-        await this.statisticsService.generateReport(generateReportDto);
+        await this.reportsService.generateReport(generateReportDto);
 
       // Return file path for download
       return {
@@ -78,7 +82,7 @@ export class StatisticsController {
       generateReportDto.userId = req.user.guid;
 
       const { fileName, filePath } =
-        await this.statisticsService.generateReport(generateReportDto);
+        await this.reportsService.generateReport(generateReportDto);
 
       // Return file path for download
       return {
