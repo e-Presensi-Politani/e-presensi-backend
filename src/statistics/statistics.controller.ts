@@ -11,6 +11,7 @@ import {
   BadRequestException,
   StreamableFile,
   Request,
+  Param,
 } from '@nestjs/common';
 import { Response } from 'express';
 import * as fs from 'fs';
@@ -101,32 +102,38 @@ export class StatisticsController {
   }
 
   @Get('download/:fileName')
-  @Header(
-    'Content-Type',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  )
   async downloadReport(
-    @Query('fileName') fileName: string,
-    @Res({ passthrough: true }) res: Response,
+    @Param('fileName') fileName: string,
+    @Res() res: Response,
   ) {
     try {
       const filePath = `${process.cwd()}/uploads/reports/${fileName}`;
-
+      
+      // Check if file exists first - BEFORE setting headers
       if (!fs.existsSync(filePath)) {
-        throw new BadRequestException('Report file not found');
+        return res.status(400).json({
+          message: 'Report file not found',
+          error: 'Bad Request',
+          statusCode: 400,
+        });
       }
 
-      const file = fs.createReadStream(filePath);
-
+      // Only set headers if file exists
       res.set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${fileName}"`,
       });
 
-      return new StreamableFile(file);
+      const file = fs.createReadStream(filePath);
+      return file.pipe(res);
     } catch (error) {
-      throw new BadRequestException(
-        `Failed to download report: ${error.message}`,
-      );
+      // If any other error occurs
+      return res.status(400).json({
+        message: `Failed to download report: ${error.message}`,
+        error: 'Bad Request',
+        statusCode: 400,
+      });
     }
   }
 }
