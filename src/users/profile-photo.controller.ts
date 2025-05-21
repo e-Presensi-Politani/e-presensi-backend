@@ -10,6 +10,7 @@ import {
   Delete,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -19,6 +20,9 @@ import { FileCategory } from '../files/interfaces/file-category.enum';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from './schemas/user.schema';
 
 @Controller('users/profile-photo')
 @UseGuards(JwtAuthGuard)
@@ -97,9 +101,40 @@ export class ProfilePhotoController {
     }
   }
 
+  @Delete(':guid')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async removeProfilePhotoByAdmin(
+    @Request() req,
+    @Param('guid') userGuid: string,
+  ) {
+    try {
+      // Get the user whose photo will be deleted
+      const user = await this.usersService.findOne(userGuid);
+
+      if (!user.profileImage) {
+        throw new NotFoundException('No profile photo to delete');
+      }
+
+      // Delete the file
+      await this.filesService.deleteFile(user.profileImage, req.user.guid);
+
+      // Remove the profile image reference from user
+      await this.usersService.updateProfilePhoto(userGuid, null);
+
+      return {
+        message: 'Profile photo removed successfully',
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to delete profile photo');
+    }
+  }
+
   @Delete()
   @UseGuards(JwtAuthGuard)
-  async removeProfilePhoto(@Request() req) {
+  async removeOwnProfilePhoto(@Request() req) {
     const user = await this.usersService.findOne(req.user.guid);
 
     if (!user.profileImage) {
