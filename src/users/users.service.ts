@@ -1,4 +1,5 @@
-// src/users/users.service.ts
+// Add to src/users/users.service.ts
+
 import {
   BadRequestException,
   Injectable,
@@ -162,5 +163,34 @@ export class UsersService {
 
     // Save the user with the new password
     return user.save();
+  }
+
+  // New method to update a user's profile photo
+  async updateProfilePhoto(
+    userId: string,
+    fileGuid: string | null,
+  ): Promise<User> {
+    const user = await this.userModel.findOne({ guid: userId }).exec();
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Update the profileImage field
+    user.profileImage = fileGuid;
+
+    // Save the updated user
+    return user.save();
+  }
+
+  // Get user with profile photo details
+  async getUserWithProfilePhoto(userId: string): Promise<User> {
+    const user = await this.userModel.findOne({ guid: userId }).exec();
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    return user;
   }
 }

@@ -11,7 +11,6 @@ import {
   Param,
   Res,
   Query,
-  ParseEnumPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,6 +21,7 @@ import { Response } from 'express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @Controller('files')
 @UseGuards(JwtAuthGuard)
@@ -120,6 +120,7 @@ export class FilesController {
     return res.sendFile(file.path, { root: './' });
   }
 
+  @Public()
   @Get(':guid/view')
   async view(@Param('guid') guid: string, @Res() res: Response) {
     const file = await this.filesService.findOne(guid);

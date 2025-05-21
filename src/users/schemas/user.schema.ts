@@ -31,8 +31,8 @@ export class User {
   @Prop()
   phoneNumber: string;
 
-  @Prop()
-  profileImage: string;
+  @Prop({ type: String, default: null })
+  profileImage: string | null = null;
 
   @Prop({ enum: UserRole, default: UserRole.DOSEN })
   role: string;

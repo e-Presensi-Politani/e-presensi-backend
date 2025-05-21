@@ -17,6 +17,7 @@ const uploadDirectories = [
   './uploads/permission',
   './uploads/profile',
   './uploads/other',
+  './uploads/reports',
 ];
 
 uploadDirectories.forEach((dir) => {
