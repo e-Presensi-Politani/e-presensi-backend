@@ -65,6 +65,13 @@ export class UsersController {
     };
   }
 
+  @Get('by-department/:department')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.KAJUR)
+  async getUsersByDepartment(@Param('department') department: string) {
+    return this.usersService.findByDepartment(department);
+  }
+
   @Get(':guid')
   @UseGuards(JwtAuthGuard)
   findOne(@Param('guid') guid: string) {

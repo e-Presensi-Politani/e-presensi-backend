@@ -72,6 +72,18 @@ export class UsersService {
     return user;
   }
 
+  async findByDepartment(department: string): Promise<User[]> {
+    // Use case-insensitive search for better user experience
+    const users = await this.userModel
+      .find({
+        department: { $regex: new RegExp(`^${department}$`, 'i') },
+        isActive: true,
+      })
+      .exec();
+
+    return users;
+  }
+
   async update(guid: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(guid);
 
