@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { StatisticsController } from './statistics.controller';
 import { StatisticsService } from './statistics.service';
 import { ReportsService } from './reports.service';
+import { BulkReportsService } from './bulk-reports.service';
 import {
   Attendance,
   AttendanceSchema,
@@ -22,7 +23,7 @@ import { ConfigModule } from '../config/config.module';
     ConfigModule,
   ],
   controllers: [StatisticsController],
-  providers: [StatisticsService, ReportsService],
-  exports: [StatisticsService, ReportsService],
+  providers: [StatisticsService, ReportsService, BulkReportsService],
+  exports: [StatisticsService, ReportsService, BulkReportsService],
 })
 export class StatisticsModule {}
