@@ -136,27 +136,60 @@ export class BulkReportsService {
     userIds?: string[],
     includeInactive: boolean = false,
   ): Promise<UserWithDepartment[]> {
+    this.logger.debug(`getTargetUsers called with:`, {
+      scope,
+      currentUserRole: currentUser?.role,
+      currentUserGuid: currentUser?.guid,
+      currentUserDepartment: currentUser?.department,
+      departmentId,
+      userIds,
+      includeInactive,
+    });
+
     let users: any[] = [];
 
     switch (scope) {
       case BulkReportScope.ALL_USERS:
-        // Only ADMIN can generate reports for all users
+        this.logger.debug('Processing ALL_USERS scope');
         if (currentUser.role !== UserRole.ADMIN) {
           throw new BadRequestException(
             'Only administrators can generate reports for all users',
           );
         }
         users = await this.usersService.findAll();
+        this.logger.debug(`Found ${users.length} users from findAll()`);
         break;
 
       case BulkReportScope.DEPARTMENT:
-        // KAJUR can generate reports for their department, ADMIN for any department
+        this.logger.debug('Processing DEPARTMENT scope');
         if (currentUser.role === UserRole.KAJUR) {
-          // KAJUR can only generate reports for their own department
           const kajurUser = await this.usersService.findOne(currentUser.guid);
+          this.logger.debug('KAJUR user details:', {
+            guid: kajurUser?.guid,
+            department: kajurUser?.department,
+            fullName: kajurUser?.fullName,
+          });
+
+          if (!kajurUser.department) {
+            throw new BadRequestException(
+              'User does not have an assigned department',
+            );
+          }
+
+          const department = await this.departmentsService.getDepartmentByName(
+            kajurUser.department,
+          );
+          this.logger.debug('Department lookup result:', department);
+
+          if (!department) {
+            throw new BadRequestException(
+              'Department not found for the current user',
+            );
+          }
+
           if (!departmentId) {
             departmentId = kajurUser.department;
-          } else if (departmentId !== kajurUser.department) {
+          } else if (departmentId !== department.guid) {
             throw new BadRequestException(
               'You can only generate reports for your own department',
             );
@@ -172,23 +205,39 @@ export class BulkReportsService {
             'Department ID is required for department scope',
           );
         }
-
-        users = await this.usersService.findByDepartment(departmentId);
+        const department = await this.departmentsService.findOne(
+          departmentId,
+        );
+        this.logger.debug(`Looking for users in department: ${departmentId}`);
+        users = await this.usersService.findByDepartment(department.name);
+        this.logger.debug(
+          `Found ${users.length} users in department ${departmentId}`,
+        );
         break;
 
       case BulkReportScope.SPECIFIC_USERS:
+        this.logger.debug('Processing SPECIFIC_USERS scope');
         if (!userIds || userIds.length === 0) {
           throw new BadRequestException(
             'User IDs are required for specific users scope',
           );
         }
 
-        // Validate permissions for specific users
+        this.logger.debug(`Looking for specific users: ${userIds.join(', ')}`);
+
         if (currentUser.role === UserRole.KAJUR) {
-          // KAJUR can only generate reports for users in their department
           const kajurUser = await this.usersService.findOne(currentUser.guid);
           const requestedUsers = await Promise.all(
             userIds.map((id) => this.usersService.findOne(id)),
+          );
+
+          this.logger.debug(
+            'Requested users:',
+            requestedUsers.map((u) => ({
+              guid: u?.guid,
+              department: u?.department,
+              fullName: u?.fullName,
+            })),
           );
 
           const invalidUsers = requestedUsers.filter(
@@ -196,6 +245,7 @@ export class BulkReportsService {
           );
 
           if (invalidUsers.length > 0) {
+            this.logger.debug('Invalid users found:', invalidUsers);
             throw new BadRequestException(
               'You can only generate reports for users in your department',
             );
@@ -209,31 +259,52 @@ export class BulkReportsService {
         users = await Promise.all(
           userIds.map((id) => this.usersService.findOne(id)),
         );
+        this.logger.debug(`Found ${users.length} specific users`);
         break;
 
       default:
         throw new BadRequestException('Invalid report scope');
     }
 
+    this.logger.debug(`Users before filtering inactive: ${users.length}`);
+    this.logger.debug(
+      'Sample users:',
+      users.slice(0, 3).map((u) => ({
+        guid: u?.guid,
+        fullName: u?.fullName,
+        isActive: u?.isActive,
+        department: u?.department,
+      })),
+    );
+
     // Filter inactive users if needed
     if (!includeInactive) {
+      const beforeFilter = users.length;
       users = users.filter((user) => user.isActive !== false);
+      this.logger.debug(
+        `Filtered out inactive users: ${beforeFilter} -> ${users.length}`,
+      );
     }
 
     // Get department information for each user
     const usersWithDepartment: UserWithDepartment[] = [];
 
     for (const user of users) {
+      if (!user) {
+        this.logger.warn('Null/undefined user found in users array');
+        continue;
+      }
+
       try {
-        const department = await this.departmentsService.findOne(
-          user.departmentId,
+        const department = await this.departmentsService.getDepartmentByName(
+          user.department,
         );
         usersWithDepartment.push({
           guid: user.guid,
           fullName: user.fullName,
           nip: user.nip,
           departmentId: user.departmentId,
-          departmentName: department.name,
+          departmentName: user.department,
           role: user.role,
           isActive: user.isActive,
         });
@@ -241,7 +312,6 @@ export class BulkReportsService {
         this.logger.warn(
           `Failed to get department for user ${user.fullName}: ${error.message}`,
         );
-        // Add user without department name
         usersWithDepartment.push({
           guid: user.guid,
           fullName: user.fullName,
@@ -254,6 +324,9 @@ export class BulkReportsService {
       }
     }
 
+    this.logger.debug(
+      `Final result: ${usersWithDepartment.length} users with department info`,
+    );
     return usersWithDepartment;
   }
 
