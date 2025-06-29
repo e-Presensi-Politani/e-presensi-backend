@@ -17,8 +17,10 @@ import { Response } from 'express';
 import * as fs from 'fs';
 import { StatisticsService } from './statistics.service';
 import { ReportsService } from './reports.service';
+import { BulkReportsService } from './bulk-reports.service';
 import { StatisticsQueryDto } from './dto/statistics-query.dto';
 import { GenerateReportDto } from './dto/generate-report.dto';
+import { GenerateBulkReportDto } from './dto/generate-bulk-report.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -30,6 +32,7 @@ export class StatisticsController {
   constructor(
     private readonly statisticsService: StatisticsService,
     private readonly reportsService: ReportsService,
+    private readonly bulkReportsService: BulkReportsService,
   ) {}
 
   @Get()
@@ -101,6 +104,37 @@ export class StatisticsController {
     }
   }
 
+  @Post('generate-bulk-report')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.KAJUR)
+  async generateBulkReport(
+    @Request() req,
+    @Body() generateBulkReportDto: GenerateBulkReportDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    try {
+      const { fileName, filePath } =
+        await this.bulkReportsService.generateBulkReport(
+          generateBulkReportDto,
+          req.user,
+        );
+
+      // Return file path for download
+      return {
+        success: true,
+        message: 'Bulk report generated successfully',
+        data: {
+          fileName,
+          downloadUrl: `/statistics/download/${fileName}`,
+        },
+      };
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to generate bulk report: ${error.message}`,
+      );
+    }
+  }
+
   @Get('download/:fileName')
   async downloadReport(
     @Param('fileName') fileName: string,
@@ -108,7 +142,7 @@ export class StatisticsController {
   ) {
     try {
       const filePath = `${process.cwd()}/uploads/reports/${fileName}`;
-      
+
       // Check if file exists first - BEFORE setting headers
       if (!fs.existsSync(filePath)) {
         return res.status(400).json({
