@@ -1,5 +1,5 @@
 // src/statistics/bulk-reports.service.ts
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import * as Excel from 'exceljs';
 import * as moment from 'moment';
 import * as fs from 'fs';
@@ -31,8 +31,6 @@ interface BulkReportData {
 
 @Injectable()
 export class BulkReportsService {
-  private readonly logger = new Logger(BulkReportsService.name);
-
   constructor(
     private statisticsService: StatisticsService,
     private usersService: UsersService,
@@ -99,9 +97,6 @@ export class BulkReportsService {
           statistics,
         });
       } catch (error) {
-        this.logger.warn(
-          `Failed to get statistics for user ${user.fullName}: ${error.message}`,
-        );
         // Continue with other users
       }
     }
@@ -136,39 +131,21 @@ export class BulkReportsService {
     userIds?: string[],
     includeInactive: boolean = false,
   ): Promise<UserWithDepartment[]> {
-    this.logger.debug(`getTargetUsers called with:`, {
-      scope,
-      currentUserRole: currentUser?.role,
-      currentUserGuid: currentUser?.guid,
-      currentUserDepartment: currentUser?.department,
-      departmentId,
-      userIds,
-      includeInactive,
-    });
-
     let users: any[] = [];
 
     switch (scope) {
       case BulkReportScope.ALL_USERS:
-        this.logger.debug('Processing ALL_USERS scope');
         if (currentUser.role !== UserRole.ADMIN) {
           throw new BadRequestException(
             'Only administrators can generate reports for all users',
           );
         }
         users = await this.usersService.findAll();
-        this.logger.debug(`Found ${users.length} users from findAll()`);
         break;
 
       case BulkReportScope.DEPARTMENT:
-        this.logger.debug('Processing DEPARTMENT scope');
         if (currentUser.role === UserRole.KAJUR) {
           const kajurUser = await this.usersService.findOne(currentUser.guid);
-          this.logger.debug('KAJUR user details:', {
-            guid: kajurUser?.guid,
-            department: kajurUser?.department,
-            fullName: kajurUser?.fullName,
-          });
 
           if (!kajurUser.department) {
             throw new BadRequestException(
@@ -179,7 +156,6 @@ export class BulkReportsService {
           const department = await this.departmentsService.getDepartmentByName(
             kajurUser.department,
           );
-          this.logger.debug('Department lookup result:', department);
 
           if (!department) {
             throw new BadRequestException(
@@ -205,25 +181,16 @@ export class BulkReportsService {
             'Department ID is required for department scope',
           );
         }
-        const department = await this.departmentsService.findOne(
-          departmentId,
-        );
-        this.logger.debug(`Looking for users in department: ${departmentId}`);
+        const department = await this.departmentsService.findOne(departmentId);
         users = await this.usersService.findByDepartment(department.name);
-        this.logger.debug(
-          `Found ${users.length} users in department ${departmentId}`,
-        );
         break;
 
       case BulkReportScope.SPECIFIC_USERS:
-        this.logger.debug('Processing SPECIFIC_USERS scope');
         if (!userIds || userIds.length === 0) {
           throw new BadRequestException(
             'User IDs are required for specific users scope',
           );
         }
-
-        this.logger.debug(`Looking for specific users: ${userIds.join(', ')}`);
 
         if (currentUser.role === UserRole.KAJUR) {
           const kajurUser = await this.usersService.findOne(currentUser.guid);
@@ -231,21 +198,11 @@ export class BulkReportsService {
             userIds.map((id) => this.usersService.findOne(id)),
           );
 
-          this.logger.debug(
-            'Requested users:',
-            requestedUsers.map((u) => ({
-              guid: u?.guid,
-              department: u?.department,
-              fullName: u?.fullName,
-            })),
-          );
-
           const invalidUsers = requestedUsers.filter(
             (user) => user.department !== kajurUser.department,
           );
 
           if (invalidUsers.length > 0) {
-            this.logger.debug('Invalid users found:', invalidUsers);
             throw new BadRequestException(
               'You can only generate reports for users in your department',
             );
@@ -259,31 +216,15 @@ export class BulkReportsService {
         users = await Promise.all(
           userIds.map((id) => this.usersService.findOne(id)),
         );
-        this.logger.debug(`Found ${users.length} specific users`);
         break;
 
       default:
         throw new BadRequestException('Invalid report scope');
     }
 
-    this.logger.debug(`Users before filtering inactive: ${users.length}`);
-    this.logger.debug(
-      'Sample users:',
-      users.slice(0, 3).map((u) => ({
-        guid: u?.guid,
-        fullName: u?.fullName,
-        isActive: u?.isActive,
-        department: u?.department,
-      })),
-    );
-
     // Filter inactive users if needed
     if (!includeInactive) {
-      const beforeFilter = users.length;
       users = users.filter((user) => user.isActive !== false);
-      this.logger.debug(
-        `Filtered out inactive users: ${beforeFilter} -> ${users.length}`,
-      );
     }
 
     // Get department information for each user
@@ -291,7 +232,6 @@ export class BulkReportsService {
 
     for (const user of users) {
       if (!user) {
-        this.logger.warn('Null/undefined user found in users array');
         continue;
       }
 
@@ -309,9 +249,6 @@ export class BulkReportsService {
           isActive: user.isActive,
         });
       } catch (error) {
-        this.logger.warn(
-          `Failed to get department for user ${user.fullName}: ${error.message}`,
-        );
         usersWithDepartment.push({
           guid: user.guid,
           fullName: user.fullName,
@@ -324,9 +261,6 @@ export class BulkReportsService {
       }
     }
 
-    this.logger.debug(
-      `Final result: ${usersWithDepartment.length} users with department info`,
-    );
     return usersWithDepartment;
   }
 
@@ -388,9 +322,6 @@ export class BulkReportsService {
 
       return { fileName, filePath };
     } catch (error) {
-      this.logger.error(
-        `Failed to generate bulk Excel report: ${error.message}`,
-      );
       throw new BadRequestException(
         `Failed to generate bulk Excel report: ${error.message}`,
       );
