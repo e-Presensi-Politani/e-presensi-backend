@@ -18,7 +18,6 @@ interface UserWithDepartment {
   guid: string;
   fullName: string;
   nip: string;
-  departmentId: string;
   departmentName: string;
   role: UserRole;
   isActive: boolean;
@@ -50,7 +49,7 @@ export class BulkReportsService {
       startDate,
       endDate,
       scope,
-      departmentId,
+      departmentName,
       userIds,
       title,
       includeInactive = false,
@@ -62,7 +61,7 @@ export class BulkReportsService {
     const targetUsers = await this.getTargetUsers(
       scope,
       currentUser,
-      departmentId,
+      departmentName,
       userIds,
       includeInactive,
     );
@@ -127,7 +126,7 @@ export class BulkReportsService {
   private async getTargetUsers(
     scope: BulkReportScope,
     currentUser: any,
-    departmentId?: string,
+    departmentName?: string,
     userIds?: string[],
     includeInactive: boolean = false,
   ): Promise<UserWithDepartment[]> {
@@ -153,19 +152,9 @@ export class BulkReportsService {
             );
           }
 
-          const department = await this.departmentsService.getDepartmentByName(
-            kajurUser.department,
-          );
-
-          if (!department) {
-            throw new BadRequestException(
-              'Department not found for the current user',
-            );
-          }
-
-          if (!departmentId) {
-            departmentId = kajurUser.department;
-          } else if (departmentId !== department.guid) {
+          if (!departmentName) {
+            departmentName = kajurUser.department;
+          } else if (departmentName !== kajurUser.department) {
             throw new BadRequestException(
               'You can only generate reports for your own department',
             );
@@ -176,13 +165,22 @@ export class BulkReportsService {
           );
         }
 
-        if (!departmentId) {
+        if (!departmentName) {
           throw new BadRequestException(
-            'Department ID is required for department scope',
+            'Department name is required for department scope',
           );
         }
-        const department = await this.departmentsService.findOne(departmentId);
-        users = await this.usersService.findByDepartment(department.name);
+
+        // Validate that the department exists
+        const department =
+          await this.departmentsService.getDepartmentByName(departmentName);
+        if (!department) {
+          throw new BadRequestException(
+            `Department '${departmentName}' not found`,
+          );
+        }
+
+        users = await this.usersService.findByDepartment(departmentName);
         break;
 
       case BulkReportScope.SPECIFIC_USERS:
@@ -227,7 +225,7 @@ export class BulkReportsService {
       users = users.filter((user) => user.isActive !== false);
     }
 
-    // Get department information for each user
+    // Transform users to UserWithDepartment format
     const usersWithDepartment: UserWithDepartment[] = [];
 
     for (const user of users) {
@@ -235,30 +233,14 @@ export class BulkReportsService {
         continue;
       }
 
-      try {
-        const department = await this.departmentsService.getDepartmentByName(
-          user.department,
-        );
-        usersWithDepartment.push({
-          guid: user.guid,
-          fullName: user.fullName,
-          nip: user.nip,
-          departmentId: user.departmentId,
-          departmentName: user.department,
-          role: user.role,
-          isActive: user.isActive,
-        });
-      } catch (error) {
-        usersWithDepartment.push({
-          guid: user.guid,
-          fullName: user.fullName,
-          nip: user.nip,
-          departmentId: user.departmentId,
-          departmentName: 'Unknown',
-          role: user.role,
-          isActive: user.isActive,
-        });
-      }
+      usersWithDepartment.push({
+        guid: user.guid,
+        fullName: user.fullName,
+        nip: user.nip,
+        departmentName: user.department || 'Unknown',
+        role: user.role,
+        isActive: user.isActive,
+      });
     }
 
     return usersWithDepartment;

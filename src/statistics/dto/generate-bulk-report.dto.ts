@@ -39,7 +39,7 @@ export class GenerateBulkReportDto {
 
   @IsOptional()
   @IsString()
-  departmentId?: string;
+  departmentName?: string; // Changed from departmentId to departmentName
 
   @IsOptional()
   @IsArray()
