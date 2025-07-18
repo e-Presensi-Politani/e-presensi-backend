@@ -50,7 +50,7 @@
     "@eslint/js": "^9.30.1",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
-    "@nestjs/testing": "^11.1.4",
+    "@nestjs/testing": "^11.1.5",
     "@swc/cli": "^0.7.8",
     "@swc/core": "^1.12.14",
     "@types/bcrypt": "^5.0.2",
