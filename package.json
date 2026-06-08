@@ -21,7 +21,7 @@
     "test:universal": "jest test/universal.spec.ts"
   },
   "dependencies": {
-    "@nestjs/common": "^11.1.24",
+    "@nestjs/common": "^11.1.26",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.26",
     "@nestjs/jwt": "^11.0.2",
