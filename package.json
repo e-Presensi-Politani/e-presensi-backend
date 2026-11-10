@@ -37,7 +37,7 @@
     "exceljs": "^4.4.0",
     "joi": "^18.2.9",
     "moment": "^2.31.0",
-    "mongoose": "^9.9.4",
+    "mongoose": "^9.12.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
